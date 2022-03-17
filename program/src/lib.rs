@@ -16,7 +16,7 @@ pub mod entrypoint;
 // Export current sdk types for downstream users building with a different sdk version
 pub use solana_program;
 use solana_program::pubkey::Pubkey;
-use state::{Store, COLLECTION_MINT, PREFIX};
+use state::{PassStore, COLLECTION_MINT, PREFIX};
 
 
 solana_program::declare_id!("passK9sjcBkUzWu35gf2x4EmpcrkZB9NXgHWtgAzxhB");
@@ -45,14 +45,15 @@ pub fn find_pass_store_program_address(program_id: &Pubkey, authority: &Pubkey) 
             PREFIX.as_bytes(),
             program_id.as_ref(),
             &authority.to_bytes(),
-            Store::PREFIX.as_bytes(),
+            PassStore::PREFIX.as_bytes(),
         ],
         program_id,
     )
 }
 
+
 /// Generates master pass address
-pub fn find_master_pass_program_address(program_id: &Pubkey, mint: &Pubkey) -> (Pubkey, u8) {
+pub fn find_pass_book_program_address(program_id: &Pubkey, mint: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
             PREFIX.as_bytes(),

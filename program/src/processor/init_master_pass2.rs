@@ -3,13 +3,13 @@
 use crate::{
     error::NFTPassError,
     id,
-    instruction::InitMasterPassArgs,
+    instruction::InitPassBookArgs,
     state::{
-        InitMasterPassParams, MasterPass, Store, MAX_DESCRIPTION_LEN, MAX_MASTER_PASS_LEN,
+        InitPassBook, PassBook, PassStore, MAX_DESCRIPTION_LEN, MAX_MASTER_PASS_LEN,
         MAX_NAME_LENGTH, MAX_URI_LENGTH, PREFIX
     },
     find_pass_store_program_address,
-    find_master_pass_program_address,
+    find_pass_book_program_address,
     utils::*,
 };
 
@@ -31,10 +31,10 @@ use mpl_token_metadata::{
 use spl_token::state::Account;
 
 /// Process InitPass instruction
-pub fn init_master_pass(
+pub fn init_pass_book(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
-    args: InitMasterPassArgs,
+    args: InitPassBookArgs,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let master_pass_account = next_account_info(account_info_iter)?;
@@ -62,11 +62,11 @@ pub fn init_master_pass(
         PREFIX.as_bytes(),
         program_id.as_ref(),
         &authority_info.key.to_bytes(),
-        Store::PREFIX.as_bytes(),
+        PassStore::PREFIX.as_bytes(),
         &[store_bump_seed],
     ];
 
-    let mut store: Store = get_pass_store_data(
+    let mut store: PassStore = get_pass_store_data(
         program_id,
         store_info,
         authority_info,
@@ -79,7 +79,7 @@ pub fn init_master_pass(
     assert_account_key(authority_info, &store.authority, Some(NFTPassError::InvalidAuthorityKey))?;
 
     let (master_pass_key, master_pass_bump_seed) =
-    find_master_pass_program_address(program_id, mint_info.key);
+    find_pass_book_program_address(program_id, mint_info.key);
 
     let master_pass_signer_seeds = &[
         PREFIX.as_bytes(),
@@ -88,7 +88,7 @@ pub fn init_master_pass(
         &[master_pass_bump_seed],
     ];
     if master_pass_account.key != &master_pass_key {
-        return Err(NFTPassError::InvalidMasterPassKey.into());
+        return Err(NFTPassError::InvalidPassBookKey.into());
     }
     // create and allocated pass pda account
     create_or_allocate_account_raw(
@@ -101,7 +101,7 @@ pub fn init_master_pass(
         master_pass_signer_seeds,
     )?;
 
-    let mut master_pass = MasterPass::unpack_unchecked(&master_pass_account.data.borrow_mut())?;
+    let mut master_pass = PassBook::unpack_unchecked(&master_pass_account.data.borrow_mut())?;
 
     if master_pass.is_initialized() {
         return Err(ProgramError::AccountAlreadyInitialized);
@@ -119,7 +119,7 @@ pub fn init_master_pass(
         return Err(NFTPassError::DescriptionTooLong.into());
     }
 
-    master_pass.init(InitMasterPassParams {
+    master_pass.init(InitPassBook {
         mint: *mint_info.key,
         name: args.name,
         description: args.description,
@@ -176,9 +176,9 @@ pub fn init_master_pass(
         &[],
     )?;
 
-    MasterPass::pack(master_pass, *master_pass_account.data.borrow_mut())?;
+    PassBook::pack(master_pass, *master_pass_account.data.borrow_mut())?;
     store.increment_pass_collection_count()?;
-    Store::pack(store, *store_info.data.borrow_mut())?;
+    PassStore::pack(store, *store_info.data.borrow_mut())?;
     Ok(())
 }
 
@@ -190,10 +190,10 @@ pub fn get_pass_store_data<'a>(
     rent_sysvar_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
     signers_seeds: &[&[u8]],
-) -> Result<Store, ProgramError> {
+) -> Result<PassStore, ProgramError> {
     // set up pass store account
 
-    let unpack = Store::unpack(&store_info.data.borrow_mut());
+    let unpack = PassStore::unpack(&store_info.data.borrow_mut());
 
     let proving_process = match unpack {
         Ok(data) => Ok(data),
@@ -205,13 +205,13 @@ pub fn get_pass_store_data<'a>(
                 rent_sysvar_info,
                 system_program_info,
                 payer_info,
-                Store::LEN,
+                PassStore::LEN,
                 signers_seeds,
             )?;
 
             msg!("New pass store account was created");
 
-            let mut data = Store::unpack_unchecked(&store_info.data.borrow_mut())?;
+            let mut data = PassStore::unpack_unchecked(&store_info.data.borrow_mut())?;
 
             data.init(*authority_info.key);
             Ok(data)

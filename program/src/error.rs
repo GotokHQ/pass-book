@@ -24,9 +24,13 @@ pub enum NFTPassError {
     #[error("InvalidMintKey")]
     InvalidMintKey,
 
-    /// Invalid Store Key
+    /// Invalid PassStore Key
     #[error("InvalidStoreKey")]
     InvalidStoreKey,
+
+    /// Invalid Program Authority Key
+    #[error("InvalidProgramAuthority")]
+    InvalidProgramAuthority,
 
     /// Wrong pass state to change data
     #[error("Wrong pass state to change data")]
@@ -45,8 +49,8 @@ pub enum NFTPassError {
     Underflow,
 
     /// Invalid Master Pass Key
-    #[error("InvalidMasterPassKey")]
-    InvalidMasterPassKey,
+    #[error("InvalidPassBookKey")]
+    InvalidPassBookKey,
 
     /// Invalid Pass Key
     #[error("InvalidPassKey")]

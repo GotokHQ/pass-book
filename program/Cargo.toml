@@ -1,5 +1,5 @@
 [package]
-name = "gtk-nft-pass"
+name = "nft-pass-book"
 version = "0.1.0"
 edition = "2021"
 

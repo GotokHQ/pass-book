@@ -1,8 +1,8 @@
 use crate::*;
-use gtk_nft_pass::{
+use nft_pass_book::{
     instruction::{self},
-    state::MasterPass,
-    find_master_pass_program_address,
+    state::PassBook,
+    find_pass_book_program_address,
 };
 use solana_program::{
     program_pack::Pack, pubkey::Pubkey, system_instruction,
@@ -18,16 +18,16 @@ use solana_sdk::{
 use spl_token::state::Account;
 
 #[derive(Debug)]
-pub struct TestMasterPass {
+pub struct TestPassBook {
     pub pubkey: Pubkey,
     pub token_account: Keypair,
     pub store: Pubkey,
 }
 
-impl TestMasterPass {
+impl TestPassBook {
     #[allow(clippy::new_without_default)]
     pub fn new(store: Pubkey, mint: Pubkey) -> Self {
-        let (pubkey, _) = find_master_pass_program_address(&gtk_nft_pass::id(), &mint);
+        let (pubkey, _) = find_pass_book_program_address(&nft_pass_book::id(), &mint);
         Self {
             pubkey,
             token_account: Keypair::new(),
@@ -35,9 +35,9 @@ impl TestMasterPass {
         }
     }
 
-    pub async fn get_data(&self, context: &mut ProgramTestContext) -> MasterPass {
+    pub async fn get_data(&self, context: &mut ProgramTestContext) -> PassBook {
         let account = get_account(context, &self.pubkey).await;
-        MasterPass::unpack_unchecked(&account.data).unwrap()
+        PassBook::unpack_unchecked(&account.data).unwrap()
     }
 
 
@@ -47,7 +47,7 @@ impl TestMasterPass {
         test_master_edition: &TestMasterEditionV2,
         test_metadata: &TestMetadata,
         user: &User,
-        args: instruction::InitMasterPassArgs,
+        args: instruction::InitPassBookArgs,
     ) -> transport::Result<()> {
         let rent = context.banks_client.get_rent().await.unwrap();
         let tx = Transaction::new_signed_with_payer(
@@ -59,8 +59,8 @@ impl TestMasterPass {
                     Account::LEN as u64,
                     &spl_token::id(),
                 ),
-                instruction::init_master_pass(
-                    &gtk_nft_pass::id(),
+                instruction::init_pass_book(
+                    &nft_pass_book::id(),
                     &self.pubkey,
                     &user.token_account.pubkey(),
                     &self.token_account.pubkey(),

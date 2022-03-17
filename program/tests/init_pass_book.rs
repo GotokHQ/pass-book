@@ -1,9 +1,9 @@
 mod utils;
 
-use gtk_nft_pass::{
+use nft_pass_book::{
     error::NFTPassError,
     find_pass_store_program_address, instruction,
-    state::{AccountType, MasterPassState, Period},
+    state::{AccountType, PassBookState, PassType},
 };
 use num_traits::FromPrimitive;
 use solana_program_test::*; 
@@ -60,8 +60,8 @@ async fn success() {
     };
 
     let (mut context, test_metadata, test_master_edition_v2) = setup(&user).await;
-    let (store, _) = find_pass_store_program_address(&gtk_nft_pass::id(), &user.owner.pubkey());
-    let test_master_pass = TestMasterPass::new(store, test_metadata.mint.pubkey());
+    let (store, _) = find_pass_store_program_address(&nft_pass_book::id(), &user.owner.pubkey());
+    let test_master_pass = TestPassBook::new(store, test_metadata.mint.pubkey());
 
     test_master_pass
         .init(
@@ -69,12 +69,15 @@ async fn success() {
             &test_master_edition_v2,
             &test_metadata,
             &user,
-            instruction::InitMasterPassArgs {
+            instruction::InitPassBookArgs {
                 name: name.clone(),
                 uri: uri.clone(),
                 description: description.clone(),
                 mutable: true,
-                period: Period::Monthly,
+                validity_period: Some(30), //valid for 30 days
+                time_validation_authority: None,
+                collection_mint: None,
+                pass_type: PassType::Membership
             },
         )
         .await
@@ -87,9 +90,9 @@ async fn success() {
         master_pass.description.trim_matches(char::from(0)),
         description
     );
-    assert_eq!(master_pass.account_type, AccountType::MasterPass);
+    assert_eq!(master_pass.account_type, AccountType::PassBook);
     assert!(master_pass.mutable);
-    assert_eq!(master_pass.pass_state, MasterPassState::NotActivated);
+    assert_eq!(master_pass.pass_state, PassBookState::NotActivated);
     assert_eq!(master_pass.authority, user.owner.pubkey());
 }
 
@@ -105,9 +108,9 @@ async fn failure() {
         token_account: Keypair::new(),
     };
     let fake_admin = Keypair::new();
-    let (store, _) = find_pass_store_program_address(&gtk_nft_pass::id(), &fake_admin.pubkey());
+    let (store, _) = find_pass_store_program_address(&nft_pass_book::id(), &fake_admin.pubkey());
     let (mut context, test_metadata, test_master_edition_v2) = setup(&admin).await;
-    let test_master_pass = TestMasterPass::new(store, test_metadata.mint.pubkey());
+    let test_master_pass = TestPassBook::new(store, test_metadata.mint.pubkey());
 
     let result = test_master_pass
         .init(
@@ -115,12 +118,15 @@ async fn failure() {
             &test_master_edition_v2,
             &test_metadata,
             &admin,
-            instruction::InitMasterPassArgs {
+            instruction::InitPassBookArgs {
                 name: name.clone(),
                 uri: uri.clone(),
                 description: description.clone(),
                 mutable: true,
-                period: Period::Monthly,
+                validity_period: Some(30), //valid for 30 days
+                time_validation_authority: None,
+                collection_mint: None,
+                pass_type: PassType::Membership
             },
         )
         .await;

@@ -1,4 +1,4 @@
-//! MasterPass definitions
+//! PassBook definitions
 
 use super::*;
 use crate::{
@@ -24,32 +24,24 @@ pub const MAX_MASTER_PASS_LEN: usize = 1 //account type
 + 32 // authority pub key
 + 32 // mint pub key
 + 1 // mutable
-+ 5 // period
++ 1 // period
 + 1 // pass_state
 + 128; // Padding
 
 /// Distribution type
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
-pub enum Period {
-    /// Monthly 30days
-    Monthly,
-    /// Yearly  365days
-    Yearly,
-    /// Unlimited
-    Lifetime,
-    /// custom period in days
-    Custom(u32),
-}
-
-impl Default for Period {
-    fn default() -> Self {
-        Self::Monthly
-    }
+pub enum PassType {
+    /// A membership pass requires setting validity period in days
+    Membership,
+    /// A collection pass requires holding NFT belonging to a collection mint 
+    Collection,
+    /// A time pass requires a duration of time this pass is valid for and signed by a timestamp authority
+    Time,
 }
 
 /// Pack state
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
-pub enum MasterPassState {
+pub enum PassBookState {
     /// Not activated
     NotActivated,
     /// Activated
@@ -60,66 +52,81 @@ pub enum MasterPassState {
     Ended,
 }
 
-impl Default for MasterPassState {
+impl Default for PassBookState {
     fn default() -> Self {
         Self::NotActivated
     }
 }
 
 /// Initialize a PackSet params
-pub struct InitMasterPassParams {
+pub struct InitPassBook {
     /// Name
     pub name: String,
     /// Description
     pub description: String,
     /// URI
     pub uri: String,
-    /// MasterPass authority
+    /// PassBook authority
     pub authority: Pubkey,
-    /// MasterPass mint
+    /// PassBook mint
     pub mint: Pubkey,
     /// If true authority can make changes at deactivated phase
     pub mutable: bool,
-    /// Period type
-    pub period: Period,
+    /// Validity period in days
+    pub validity_period: Option<u32>,
+    /// Collection mint
+    pub collection_mint: Option<Pubkey>,
+    /// Time validation authority
+    pub time_validation_authority: Option<Pubkey>,
+    /// Pass type
+    pub pass_type: PassType,
 }
 
 /// Pack set
 #[repr(C)]
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, BorshSchema, Default)]
-pub struct MasterPass {
-    /// Account type - MasterPass
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, BorshSchema)]
+pub struct PassBook {
+    /// Account type - PassBook
     pub account_type: AccountType,
-    /// MasterPass mint
+    /// PassBook mint
     pub mint: Pubkey,
-    /// MasterPass authority
+    /// PassBook authority
     pub authority: Pubkey,
+    /// Name
+    pub name: String,
     /// Description
     pub description: String,
     /// Link to pack set image
     pub uri: String,
-    /// Name
-    pub name: String,
     /// If true authority can make changes at deactivated phase
     pub mutable: bool,
-    /// Period type
-    pub period: Period,
-    /// MasterPass state
-    pub pass_state: MasterPassState,
+    /// Pass type
+    pub pass_type: PassType,
+    /// Validity period in days
+    pub validity_period: Option<u32>,
+    /// Collection mint
+    pub collection_mint: Option<Pubkey>,
+    /// Time validation authority
+    pub time_validation_authority: Option<Pubkey>,
+    /// PassBook state
+    pub pass_state: PassBookState,
 }
 
-impl MasterPass {
+impl PassBook {
     /// Initialize a PackSet
-    pub fn init(&mut self, params: InitMasterPassParams) {
-        self.account_type = AccountType::MasterPass;
+    pub fn init(&mut self, params: InitPassBook) {
+        self.account_type = AccountType::PassBook;
         self.authority = params.authority;
         self.description = params.description;
         self.uri = params.uri;
         self.name = params.name;
         self.mint = params.mint;
         self.mutable = params.mutable;
-        self.period = params.period;
-        self.pass_state = MasterPassState::NotActivated;
+        self.pass_type = params.pass_type;
+        self.validity_period = params.validity_period;
+        self.collection_mint = params.collection_mint;
+        self.time_validation_authority = params.time_validation_authority;
+        self.pass_state = PassBookState::NotActivated;
     }
 
     // /// Decrement supply value
@@ -132,7 +139,7 @@ impl MasterPass {
 
     /// Check if pack is in activated state
     pub fn assert_activated(&self) -> Result<(), ProgramError> {
-        if self.pass_state != MasterPassState::Activated {
+        if self.pass_state != PassBookState::Activated {
             return Err(NFTPassError::PassNotActivated.into());
         }
 
@@ -145,7 +152,7 @@ impl MasterPass {
             return Err(NFTPassError::ImmutablePass.into());
         }
 
-        if self.pass_state == MasterPassState::Activated {
+        if self.pass_state == PassBookState::Activated {
             return Err(NFTPassError::WrongPassState.into());
         }
 
@@ -170,16 +177,16 @@ impl MasterPass {
     }
 }
 
-impl IsInitialized for MasterPass {
+impl IsInitialized for PassBook {
     fn is_initialized(&self) -> bool {
         self.account_type != AccountType::Uninitialized
-            && self.account_type == AccountType::MasterPass
+            && self.account_type == AccountType::PassBook
     }
 }
 
-impl Sealed for MasterPass {}
+impl Sealed for PassBook {}
 
-impl Pack for MasterPass {
+impl Pack for PassBook {
     const LEN: usize = MAX_MASTER_PASS_LEN;
 
     fn pack_into_slice(&self, dst: &mut [u8]) {
@@ -188,7 +195,7 @@ impl Pack for MasterPass {
     }
 
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
-        if (src[0] != AccountType::MasterPass as u8
+        if (src[0] != AccountType::PassBook as u8
             && src[0] != AccountType::Uninitialized as u8)
             || src.len() != Self::LEN
         {

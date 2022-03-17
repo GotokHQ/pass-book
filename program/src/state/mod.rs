@@ -4,11 +4,11 @@ use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 
 mod pass;
 mod store;
-mod master_pass;
+mod pass_book;
 
 pub use pass::*;
 pub use store::*;
-pub use master_pass::*;
+pub use pass_book::*;
 
 /// Global prefix for program addresses
 pub const PREFIX: &str = "pass";
@@ -33,9 +33,9 @@ pub enum AccountType {
     /// Pass account
     Pass,
     /// Pass store account
-    Store,
+    PassStore,
     /// Pass collection account
-    MasterPass
+    PassBook
 }
 
 impl Default for AccountType {

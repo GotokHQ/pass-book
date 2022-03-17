@@ -54,10 +54,10 @@ pub struct InitPassParams {
     pub description: String,
     /// URI
     pub uri: String,
-    /// Pass mint
-    pub mint: Pubkey,
-    /// Pass collection this bass belongs to
-    pub collection: Pubkey, 
+    /// Pass owner
+    pub owner: Pubkey,
+    /// Pass book this bass belongs to
+    pub pass_book: Pubkey, 
     /// pass expiration in unix timestamp
     pub expires_at: Option<u64>
 }
@@ -69,10 +69,10 @@ pub struct InitPassParams {
 pub struct Pass {
     /// Account type - Pass
     pub account_type: AccountType,
-    /// Pass mint
-    pub mint: Pubkey,
-    /// Pass collection
-    pub collection: Pubkey,
+    /// Owner mint
+    pub owner: Pubkey,
+    /// Pass book
+    pub pass_book: Pubkey,
     /// Description
     pub description: String,
     /// Link to pack set image
@@ -90,7 +90,8 @@ impl Pass {
     /// Initialize a PackSet
     pub fn init(&mut self, params: InitPassParams) {
         self.account_type = AccountType::Pass;
-        self.collection = params.collection;
+        self.pass_book = params.pass_book;
+        self.owner = params.owner;
         self.description = params.description;
         self.uri = params.uri;
         self.name = params.name;

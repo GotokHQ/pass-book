@@ -5,7 +5,7 @@ use crate::{
     error::NFTPassError,
     find_program_authority,
     find_pass_collection_mint,
-    state::{PREFIX, Store},
+    state::{PREFIX, PassStore},
 };
  
 use solana_program::{
@@ -228,10 +228,10 @@ pub fn create_pass_collection<'a>(
     spl_token_program_info: &AccountInfo<'a>,
     rent_sysvar_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
-) -> Result<Store, ProgramError> {
+) -> Result<PassStore, ProgramError> {
     // set up pass collection account
 
-    let unpack = Store::unpack(&pass_authority_info.data.borrow_mut());
+    let unpack = PassStore::unpack(&pass_authority_info.data.borrow_mut());
 
     let proving_process = match unpack {
         Ok(data) => Ok(data),
@@ -261,7 +261,7 @@ pub fn create_pass_collection<'a>(
                 rent_sysvar_info,
                 system_program_info,
                 payer_info,
-                Store::LEN,
+                PassStore::LEN,
                 pass_authority_signer_seeds,
             )?;
         
@@ -344,7 +344,7 @@ pub fn create_pass_collection<'a>(
 
             msg!("New pack config account was created");
 
-            let mut data = Store::unpack_unchecked(&pass_authority_info.data.borrow_mut())?;
+            let mut data = PassStore::unpack_unchecked(&pass_authority_info.data.borrow_mut())?;
 
             data.init(*collection_mint_info.key);
             Ok(data)

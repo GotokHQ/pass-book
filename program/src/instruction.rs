@@ -3,19 +3,18 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
-    pubkey::Pubkey,
     instruction::{AccountMeta, Instruction},
+    pubkey::Pubkey,
     system_program, sysvar,
 };
 
-use crate::state::Period;
-
+use crate::state::PassType;
 
 /// Initialize a PackSet arguments
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
 /// Initialize a PackSet params
-pub struct InitMasterPassArgs {
+pub struct InitPassBookArgs {
     /// Name
     pub name: String,
     /// Description
@@ -23,23 +22,29 @@ pub struct InitMasterPassArgs {
     /// URI
     pub uri: String,
     /// If true authority can make changes at deactivated phase
-    pub mutable: bool,  
-    /// Period type
-    pub period: Period,
+    pub mutable: bool,
+    /// Validity period in days
+    pub validity_period: Option<u32>,
+    /// Collection mint
+    pub collection_mint: Option<Pubkey>,
+    /// Time validation authority
+    pub time_validation_authority: Option<Pubkey>,
+    /// Pass type
+    pub pass_type: PassType,
 }
 
 /// Instruction definition
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub enum NFTPassInstruction {
-    /// InitMasterPass
+    /// InitPassBook
     ///
     /// Initialize created account.
     ///
     /// Accounts:
     ///   0.  `[writable]` Uninitialized master pass account with address as pda of (PDA ['pass', program id, master metadata mint id] )
-    ///   1.  `[writer]` Source token account that holds MasterEdition token 
+    ///   1.  `[writer]` Source token account that holds MasterEdition token
     ///   2.  `[writer]` token_account (program account to hold MasterEdition token)
-    ///   3.  `[writer]` Store account with pda of ['pass', program id, authority, 'store']
+    ///   3.  `[writer]` PassStore account with pda of ['pass', program id, authority, 'store']
     ///   4.  `[signer]` Authority of pass account
     ///   5.  `[signer]` payer
     ///   6.  `[]` Master Metadata mint
@@ -54,12 +59,12 @@ pub enum NFTPassInstruction {
     /// - URI String
     /// - mutable	bool
     /// - period    Period
-    /// - max_num_uses    Option<u64>    InitMasterPass()
-    InitMasterPass(InitMasterPassArgs),
+    /// - max_num_uses    Option<u64>    InitPassBook()
+    InitPassBook(InitPassBookArgs),
 }
 
-/// Create `InitMasterPass` instruction
-pub fn init_master_pass(
+/// Create `InitPassBook` instruction
+pub fn init_pass_book(
     program_id: &Pubkey,
     master_pass: &Pubkey,
     source: &Pubkey,
@@ -70,7 +75,7 @@ pub fn init_master_pass(
     mint: &Pubkey,
     master_metadata: &Pubkey,
     master_edition: &Pubkey,
-    args: InitMasterPassArgs,
+    args: InitPassBookArgs,
 ) -> Instruction {
     let accounts = vec![
         AccountMeta::new(*master_pass, false),
@@ -86,5 +91,9 @@ pub fn init_master_pass(
         AccountMeta::new_readonly(system_program::id(), false),
         AccountMeta::new_readonly(spl_token::id(), false),
     ];
-    Instruction::new_with_borsh(*program_id, &NFTPassInstruction::InitMasterPass(args), accounts)
+    Instruction::new_with_borsh(
+        *program_id,
+        &NFTPassInstruction::InitPassBook(args),
+        accounts,
+    )
 }

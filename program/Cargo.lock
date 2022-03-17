@@ -977,25 +977,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gtk-nft-pass"
-version = "0.1.0"
-dependencies = [
- "borsh 0.9.3",
- "mpl-token-metadata",
- "num-derive",
- "num-traits",
- "num_enum",
- "rand 0.8.5",
- "solana-program",
- "solana-program-test",
- "solana-sdk",
- "spl-associated-token-account",
- "spl-math",
- "spl-token",
- "thiserror",
-]
-
-[[package]]
 name = "h2"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1423,6 +1404,25 @@ dependencies = [
  "num-derive",
  "num-traits",
  "solana-program",
+ "spl-token",
+ "thiserror",
+]
+
+[[package]]
+name = "nft-pass-book"
+version = "0.1.0"
+dependencies = [
+ "borsh 0.9.3",
+ "mpl-token-metadata",
+ "num-derive",
+ "num-traits",
+ "num_enum",
+ "rand 0.8.5",
+ "solana-program",
+ "solana-program-test",
+ "solana-sdk",
+ "spl-associated-token-account",
+ "spl-math",
  "spl-token",
  "thiserror",
 ]

@@ -1,2 +1,2 @@
 #![allow(unused_imports)]
-use gtk_nft_pass::*;
+use nft_pass_book::*;

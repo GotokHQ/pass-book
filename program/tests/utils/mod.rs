@@ -1,12 +1,12 @@
 mod edition;
 mod master_edition_v2;
-mod master_pass;
+mod pass_book;
 mod metadata;
 mod user;
 mod assert;
 
 pub use master_edition_v2::TestMasterEditionV2;
-pub use master_pass::TestMasterPass;
+pub use pass_book::TestPassBook;
 pub use metadata::TestMetadata;
 pub use user::User;
 pub use assert::*;
@@ -19,7 +19,7 @@ use solana_sdk::{
 use spl_token::state::Mint;
 
 pub fn gtk_packs_program_test<'a>() -> ProgramTest {
-    let mut program = ProgramTest::new("gtk_nft_pass", gtk_nft_pass::id(), None);
+    let mut program = ProgramTest::new("nft_pass_book", nft_pass_book::id(), None);
     program.add_program("mpl_token_metadata", mpl_token_metadata::id(), None);
     program.prefer_bpf(false);
     program
