@@ -5,7 +5,7 @@ import {
   AnyPublicKey,
   Account,
 } from '@metaplex-foundation/mpl-core';
-import { AccountInfo } from '@solana/web3.js';
+import { AccountInfo, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { AccountKey } from './constants';
 import { PassBookProgram } from '../PassBookProgram';
@@ -40,11 +40,21 @@ export class StoreData extends Borsh.Data<Args> {
 }
 
 export class Store extends Account<StoreData> {
+  static readonly STORE_PREFIX = 'store';
   constructor(pubkey: AnyPublicKey, info: AccountInfo<Buffer>) {
     super(pubkey, info);
     if (!this.assertOwner(PassBookProgram.PUBKEY)) {
       throw ERROR_INVALID_OWNER();
     }
     this.data = StoreData.deserialize(this.info.data);
+  }
+
+  static async getPDA(authority: AnyPublicKey) {
+    return PassBookProgram.findProgramAddress([
+      Buffer.from(PassBookProgram.PREFIX),
+      PassBookProgram.PUBKEY.toBuffer(),
+      new PublicKey(authority).toBuffer(),
+      Buffer.from(Store.STORE_PREFIX),
+    ]);
   }
 }

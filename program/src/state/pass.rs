@@ -54,8 +54,6 @@ pub struct InitPassParams {
     pub description: String,
     /// URI
     pub uri: String,
-    /// Pass owner
-    pub owner: Pubkey,
     /// Pass book this bass belongs to
     pub pass_book: Pubkey, 
     /// pass expiration in unix timestamp
@@ -69,8 +67,8 @@ pub struct InitPassParams {
 pub struct Pass {
     /// Account type - Pass
     pub account_type: AccountType,
-    /// Owner mint
-    pub owner: Pubkey,
+    /// mint
+    pub mint: Pubkey,
     /// Pass book
     pub pass_book: Pubkey,
     /// Description
@@ -87,6 +85,7 @@ pub struct Pass {
 
 
 impl Pass {
+    pub const PREFIX: &'static str = "pass";
     /// Initialize a PackSet
     pub fn init(&mut self, params: InitPassParams) {
         self.account_type = AccountType::Pass;

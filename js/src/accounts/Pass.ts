@@ -27,8 +27,8 @@ type Args = {
   passState: PassState;
 };
 
-export class PassBookData extends Borsh.Data<Args> {
-  static readonly SCHEMA = PassBookData.struct([
+export class PassData extends Borsh.Data<Args> {
+  static readonly SCHEMA = PassData.struct([
     ['key', 'u8'],
     ['mint', 'pubkeyAsString'],
     ['authority', 'pubkeyAsString'],
@@ -65,10 +65,11 @@ export class PassBookData extends Borsh.Data<Args> {
   }
 }
 
-export class PassBook extends Account<PassBookData> {
+export class Pass extends Account<PassData> {
+  static readonly PASS_PREFIX = 'store';
   constructor(pubkey: AnyPublicKey, info: AccountInfo<Buffer>) {
     super(pubkey, info);
-    this.data = PassBookData.deserialize(this.info.data);
+    this.data = PassData.deserialize(this.info.data);
     if (!this.assertOwner(PassBookProgram.PUBKEY)) {
       throw ERROR_INVALID_OWNER();
     }
@@ -79,6 +80,7 @@ export class PassBook extends Account<PassBookData> {
       Buffer.from(PassBookProgram.PREFIX),
       PassBookProgram.PUBKEY.toBuffer(),
       new PublicKey(mint).toBuffer(),
+      Buffer.from(Pass.PASS_PREFIX),
     ]);
   }
 
@@ -114,21 +116,39 @@ export class PassBook extends Account<PassBookData> {
     ].filter(Boolean);
 
     return (await PassBookProgram.getProgramAccounts(connection, { filters: baseFilters })).map(
-      (account) => PassBook.from(account),
+      (account) => Pass.from(account),
     );
   }
 
-  static async findByMint(connection: Connection, mint: AnyPublicKey): Promise<PassBook> {
-    const pda = await PassBook.getPDA(mint);
-    return PassBook.load(connection, pda);
+  static async findByMint(connection: Connection, mint: AnyPublicKey): Promise<Pass> {
+    const pda = await Pass.getPDA(mint);
+
+    return Pass.load(connection, pda);
   }
 
-  static async findByAuthority(
+  static async findInfoByOwner(
     connection: Connection,
-    authority: AnyPublicKey,
-  ): Promise<Account<PassBook>[]> {
-    return await PassBook.findMany(connection, {
-      authority,
-    });
+    owner: AnyPublicKey,
+  ): Promise<Map<AnyPublicKey, AccountInfo<Buffer>>> {
+    const accounts = await TokenAccount.getTokenAccountsByOwner(connection, owner);
+
+    const metadataPdaLookups = accounts.reduce((memo, { data }) => {
+      // Only include tokens where amount equal to 1.
+      // Note: This is not the same as mint supply.
+      // NFTs by definition have supply of 1, but an account balance > 1 implies a mint supply > 1.
+      return data.amount?.eq(new BN(1)) ? [...memo, Pass.getPDA(data.mint)] : memo;
+    }, []);
+
+    const metadataAddresses = await Promise.all(metadataPdaLookups);
+
+    return Account.getInfos(connection, metadataAddresses);
+  }
+
+  static async findPassDataByOwner(
+    connection: Connection,
+    owner: AnyPublicKey,
+  ): Promise<PassData[]> {
+    const tokenInfo = await Pass.findInfoByOwner(connection, owner);
+    return Array.from(tokenInfo.values()).map((m) => PassData.deserialize(m.data));
   }
 }

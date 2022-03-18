@@ -55,9 +55,9 @@ export type InitPassBookParams = {
   masterMetadata: PublicKey;
   masterEdition: PublicKey;
   store: PublicKey;
-  token_account: PublicKey;
+  tokenAccount: PublicKey;
   source: PublicKey;
-  pass_book: PublicKey;
+  passBook: PublicKey;
   mint: PublicKey;
   validityPeriod?: number;
   collectionMint?: StringPublicKey;
@@ -65,7 +65,7 @@ export type InitPassBookParams = {
   passType: PassType;
 };
 
-export class InitMasterPass extends Transaction {
+export class InitPassBook extends Transaction {
   constructor(options: TransactionCtorFields, params: InitPassBookParams) {
     super(options);
     const { feePayer } = options;
@@ -74,9 +74,9 @@ export class InitMasterPass extends Transaction {
       description,
       uri,
       mutable,
-      pass_book,
+      passBook,
       source,
-      token_account,
+      tokenAccount,
       store,
       authority,
       masterMetadata,
@@ -103,7 +103,7 @@ export class InitMasterPass extends Transaction {
       new TransactionInstruction({
         keys: [
           {
-            pubkey: pass_book,
+            pubkey: passBook,
             isSigner: false,
             isWritable: true,
           },
@@ -113,7 +113,7 @@ export class InitMasterPass extends Transaction {
             isWritable: true,
           },
           {
-            pubkey: token_account,
+            pubkey: tokenAccount,
             isSigner: true,
             isWritable: true,
           },

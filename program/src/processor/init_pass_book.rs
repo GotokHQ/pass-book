@@ -5,7 +5,7 @@ use crate::{
     id,
     instruction::InitPassBookArgs,
     state::{
-        InitPassBook, PassBook, PassStore, MAX_DESCRIPTION_LEN, MAX_MASTER_PASS_LEN,
+        InitPassBook, PassBook, PassStore, MAX_DESCRIPTION_LEN, MAX_PASS_BOOK_LEN,
         MAX_NAME_LENGTH, MAX_URI_LENGTH, PREFIX, PassType
     },
     find_pass_store_program_address,
@@ -78,16 +78,16 @@ pub fn init_pass_book(
 
     assert_account_key(authority_info, &store.authority, Some(NFTPassError::InvalidAuthorityKey))?;
 
-    let (master_pass_key, master_pass_bump_seed) =
+    let (pass_book_key, pass_book_bump_seed) =
     find_pass_book_program_address(program_id, mint_info.key);
 
-    let master_pass_signer_seeds = &[
+    let pass_book_signer_seeds = &[
         PREFIX.as_bytes(),
         program_id.as_ref(),
         &mint_info.key.to_bytes(),
-        &[master_pass_bump_seed],
+        &[pass_book_bump_seed],
     ];
-    if pass_book_info.key != &master_pass_key {
+    if pass_book_info.key != &pass_book_key {
         return Err(NFTPassError::InvalidPassBookKey.into());
     }
     // create and allocated pass pda account
@@ -97,13 +97,13 @@ pub fn init_pass_book(
         rent_info,
         system_account_info,
         payer_account_info,
-        MAX_MASTER_PASS_LEN,
-        master_pass_signer_seeds,
+        MAX_PASS_BOOK_LEN,
+        pass_book_signer_seeds,
     )?;
 
-    let mut master_pass = PassBook::unpack_unchecked(&pass_book_info.data.borrow_mut())?;
+    let mut pass_book = PassBook::unpack_unchecked(&pass_book_info.data.borrow_mut())?;
 
-    if master_pass.is_initialized() {
+    if pass_book.is_initialized() {
         return Err(ProgramError::AccountAlreadyInitialized);
     }
 
@@ -136,7 +136,7 @@ pub fn init_pass_book(
             }          
         }
     }
-    master_pass.init(InitPassBook {
+    pass_book.init(InitPassBook {
         mint: *mint_info.key,
         name: args.name,
         description: args.description,
@@ -149,7 +149,7 @@ pub fn init_pass_book(
         pass_type: args.pass_type
     });
 
-    master_pass.puff_out_data_fields();
+    pass_book.puff_out_data_fields();
 
     let token_metadata_program_id = mpl_token_metadata::id();
 
@@ -197,7 +197,7 @@ pub fn init_pass_book(
         &[],
     )?;
 
-    PassBook::pack(master_pass, *pass_book_info.data.borrow_mut())?;
+    PassBook::pack(pass_book, *pass_book_info.data.borrow_mut())?;
     store.increment_pass_book_count()?;
     PassStore::pack(store, *store_info.data.borrow_mut())?;
     Ok(())

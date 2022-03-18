@@ -14,7 +14,7 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
-pub const MAX_MASTER_PASS_LEN: usize = 1 //account type 
+pub const MAX_PASS_BOOK_LEN: usize = 1 //account type 
 +4
 + MAX_NAME_LENGTH // name
 +4
@@ -88,10 +88,10 @@ pub struct InitPassBook {
 pub struct PassBook {
     /// Account type - PassBook
     pub account_type: AccountType,
-    /// PassBook mint
-    pub mint: Pubkey,
     /// PassBook authority
     pub authority: Pubkey,
+    /// PassBook mint
+    pub mint: Pubkey,
     /// Name
     pub name: String,
     /// Description
@@ -187,7 +187,7 @@ impl IsInitialized for PassBook {
 impl Sealed for PassBook {}
 
 impl Pack for PassBook {
-    const LEN: usize = MAX_MASTER_PASS_LEN;
+    const LEN: usize = MAX_PASS_BOOK_LEN;
 
     fn pack_into_slice(&self, dst: &mut [u8]) {
         let mut slice = dst;

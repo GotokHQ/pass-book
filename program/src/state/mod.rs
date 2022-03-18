@@ -11,11 +11,13 @@ pub use store::*;
 pub use pass_book::*;
 
 /// Global prefix for program addresses
-pub const PREFIX: &str = "pass";
+pub const PREFIX: &str = "passbook";
 
 pub const COLLECTION_MINT: &str = "mint";
 
 pub const STORE: &str = "store";
+
+pub const PASS: &str = "pass";
 
 /// Max len of pass URI
 pub const MAX_URI_LENGTH: usize = 200;
