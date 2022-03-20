@@ -4,9 +4,7 @@ import {
   AnyPublicKey,
   ERROR_INVALID_OWNER,
   Account,
-  TokenAccount,
 } from '@metaplex-foundation/mpl-core';
-import BN from 'bn.js';
 import bs58 from 'bs58';
 import { AccountInfo, Connection, PublicKey } from '@solana/web3.js';
 import { PassBookProgram } from '../PassBookProgram';
@@ -30,8 +28,8 @@ type Args = {
 export class PassBookData extends Borsh.Data<Args> {
   static readonly SCHEMA = PassBookData.struct([
     ['key', 'u8'],
-    ['mint', 'pubkeyAsString'],
     ['authority', 'pubkeyAsString'],
+    ['mint', 'pubkeyAsString'],
     ['name', 'string'],
     ['description', 'string'],
     ['uri', 'string'],

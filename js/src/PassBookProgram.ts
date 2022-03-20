@@ -4,7 +4,7 @@ import { Store } from './accounts';
 
 export class PassBookProgram extends Program {
   static readonly PREFIX = 'passbook';
-  static readonly PUBKEY = new PublicKey('passK9sjcBkUzWu35gf2x4EmpcrkZB9NXgHWtgAzxhB');
+  static readonly PUBKEY = new PublicKey('passjvPvHQWN4SvBCmHk1gdrtBvoHRERtQK9MKemreQ');
 
   static async findProgramAuthority(): Promise<[PublicKey, number]> {
     return PublicKey.findProgramAddress(

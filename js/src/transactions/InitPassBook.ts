@@ -43,7 +43,6 @@ export class InitPassBookArgs extends Borsh.Data<Args> {
   collectionMint?: StringPublicKey;
   timeValidationAuthority?: StringPublicKey;
   passType: PassType;
-  //maxSupply: BN | null;
 }
 
 export type InitPassBookParams = {
@@ -55,14 +54,14 @@ export type InitPassBookParams = {
   masterMetadata: PublicKey;
   masterEdition: PublicKey;
   store: PublicKey;
-  tokenAccount: PublicKey;
   source: PublicKey;
   passBook: PublicKey;
   mint: PublicKey;
   validityPeriod?: number;
-  collectionMint?: StringPublicKey;
-  timeValidationAuthority?: StringPublicKey;
+  collectionMint?: PublicKey;
+  timeValidationAuthority?: PublicKey;
   passType: PassType;
+  tokenAccount: PublicKey;
 };
 
 export class InitPassBook extends Transaction {
@@ -76,7 +75,6 @@ export class InitPassBook extends Transaction {
       mutable,
       passBook,
       source,
-      tokenAccount,
       store,
       authority,
       masterMetadata,
@@ -86,6 +84,7 @@ export class InitPassBook extends Transaction {
       collectionMint,
       timeValidationAuthority,
       passType,
+      tokenAccount
     } = params;
 
     const data = InitPassBookArgs.serialize({
@@ -94,11 +93,10 @@ export class InitPassBook extends Transaction {
       uri,
       mutable,
       validityPeriod,
-      collectionMint,
-      timeValidationAuthority,
+      collectionMint: collectionMint?.toString(),
+      timeValidationAuthority: timeValidationAuthority?.toString(),
       passType,
     });
-
     this.add(
       new TransactionInstruction({
         keys: [
@@ -114,7 +112,7 @@ export class InitPassBook extends Transaction {
           },
           {
             pubkey: tokenAccount,
-            isSigner: true,
+            isSigner: false,
             isWritable: true,
           },
           {
@@ -148,12 +146,12 @@ export class InitPassBook extends Transaction {
             isWritable: false,
           },
           {
-            pubkey: SystemProgram.programId,
+            pubkey: SYSVAR_RENT_PUBKEY,
             isSigner: false,
             isWritable: false,
           },
           {
-            pubkey: SYSVAR_RENT_PUBKEY,
+            pubkey: SystemProgram.programId,
             isSigner: false,
             isWritable: false,
           },

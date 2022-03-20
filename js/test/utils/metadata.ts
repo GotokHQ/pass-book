@@ -2,43 +2,92 @@ import test from 'tape';
 import spok from 'spok';
 
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
-import { MetadataData, MetadataDataData } from '../../src/mpl-token-metadata';
-import { connectionURL } from './';
-import { airdrop, PayerTransactionHandler } from '@metaplex-foundation/amman';
+import { defaultSendOptions, TransactionHandler } from '@metaplex-foundation/amman';
 
-import { addLabel } from './address-labels';
-import { mintAndCreateMetadata } from '../actions';
+import {
+  CreateMetadata,
+  CreateMetadataV2,
+  DataV2,
+  Metadata,
+  MetadataData,
+  MetadataDataData,
+} from '@metaplex-foundation/mpl-token-metadata';
+import * as spl from '@solana/spl-token';
+import { addLabel, logDebug } from '.';
 
 export const URI = 'uri';
 export const NAME = 'test';
 export const SYMBOL = 'sym';
 export const SELLER_FEE_BASIS_POINTS = 10;
 
-export async function initMetadata() {
-  const payer = Keypair.generate();
-  addLabel('payer', payer);
+type CreateMetadataV2Params = {
+  transactionHandler: TransactionHandler;
+  publicKey: PublicKey;
+  mint: PublicKey;
+  metadataData: DataV2;
+  updateAuthority?: PublicKey;
+};
 
-  const connection = new Connection(connectionURL, 'singleGossip');
-  const transactionHandler = new PayerTransactionHandler(connection, payer);
+type CreateMetadataParams = {
+  transactionHandler: TransactionHandler;
+  publicKey: PublicKey;
+  editionMint: PublicKey;
+  metadataData: MetadataDataData;
+  updateAuthority?: PublicKey;
+};
 
-  await airdrop(connection, payer.publicKey, 2);
+export async function createMetadata({
+  transactionHandler,
+  publicKey,
+  editionMint,
+  metadataData,
+  updateAuthority,
+}: CreateMetadataParams) {
+  const metadata = await Metadata.getPDA(editionMint);
+  const createMetadataTx = new CreateMetadata(
+    { feePayer: publicKey },
+    {
+      metadata,
+      metadataData,
+      updateAuthority: updateAuthority ?? publicKey,
+      mint: editionMint,
+      mintAuthority: publicKey,
+    },
+  );
 
-  const initMetadataData = new MetadataDataData({
-    uri: URI,
-    name: NAME,
-    symbol: SYMBOL,
-    sellerFeeBasisPoints: SELLER_FEE_BASIS_POINTS,
-    creators: null,
+  const createTxDetails = await transactionHandler.sendAndConfirmTransaction(
+    createMetadataTx,
+    [],
+    defaultSendOptions,
+  );
+
+  return { metadata, createTxDetails };
+}
+
+export async function createMetadataV2({
+  transactionHandler,
+  publicKey,
+  mint,
+  metadataData,
+  updateAuthority,
+}: CreateMetadataV2Params) {
+  const metadata = await Metadata.getPDA(mint);
+  const createMetadataTx = new CreateMetadataV2(
+    { feePayer: publicKey },
+    {
+      metadata,
+      metadataData,
+      updateAuthority: updateAuthority ?? publicKey,
+      mint: mint,
+      mintAuthority: publicKey,
+    },
+  );
+
+  const createTxDetails = await transactionHandler.sendAndConfirmTransaction(createMetadataTx, [], {
+    skipPreflight: false,
   });
 
-  const { mint, metadata } = await mintAndCreateMetadata(
-    connection,
-    transactionHandler,
-    payer,
-    initMetadataData,
-  );
-  const initialMetadata = await getMetadataData(connection, metadata);
-  return { connection, transactionHandler, payer, mint, metadata, initialMetadata };
+  return { metadata, createTxDetails };
 }
 
 export async function getMetadataData(
@@ -47,6 +96,38 @@ export async function getMetadataData(
 ): Promise<MetadataData> {
   const metadataAccount = await connection.getAccountInfo(metadata);
   return MetadataData.deserialize(metadataAccount.data);
+}
+
+export async function mintAndCreateMetadataV2(
+  connection: Connection,
+  transactionHandler: TransactionHandler,
+  payer: Keypair,
+  args: DataV2,
+) {
+  const mint = await spl.Token.createMint(
+    connection,
+    payer,
+    payer.publicKey,
+    null,
+    0,
+    spl.TOKEN_PROGRAM_ID,
+  );
+
+  const source = await mint.getOrCreateAssociatedAccountInfo(payer.publicKey);
+
+  await mint.mintTo(source.address, payer.publicKey, [], 1);
+  addLabel('mint', mint.publicKey);
+  const initMetadataData = args;
+  const { createTxDetails, metadata } = await createMetadataV2({
+    transactionHandler,
+    publicKey: payer.publicKey,
+    mint: mint.publicKey,
+    metadataData: initMetadataData,
+  });
+
+  addLabel('metadata', metadata);
+  logDebug(createTxDetails.txSummary.logMessages.join('\n'));
+  return { mint, metadata, source: source.address };
 }
 
 export async function assertMetadataDataUnchanged(
