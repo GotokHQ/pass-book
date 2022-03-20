@@ -121,7 +121,7 @@ pub fn init_pass_book(
 
     match args.pass_type {
         PassType::Membership => {
-            if args.validity_period.is_none() || args.collection_mint.is_some() || args.time_validation_authority.is_some() {
+            if args.collection_mint.is_some() || args.time_validation_authority.is_some() {
                 return Err(ProgramError::InvalidArgument);
             }
         },

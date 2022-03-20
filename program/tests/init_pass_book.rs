@@ -61,7 +61,7 @@ async fn success() {
 
     let (mut context, test_metadata, test_master_edition_v2) = setup(&user).await;
     let (store, _) = find_pass_store_program_address(&nft_pass_book::id(), &user.owner.pubkey());
-    let test_master_pass = TestPassBook::new(store, test_metadata.mint.pubkey());
+    let test_master_pass = TestPassBook::new(test_metadata.mint.pubkey());
 
     test_master_pass
         .init(
@@ -69,6 +69,7 @@ async fn success() {
             &test_master_edition_v2,
             &test_metadata,
             &user,
+            &store,
             instruction::InitPassBookArgs {
                 name: name.clone(),
                 uri: uri.clone(),
@@ -110,7 +111,7 @@ async fn failure() {
     let fake_admin = Keypair::new();
     let (store, _) = find_pass_store_program_address(&nft_pass_book::id(), &fake_admin.pubkey());
     let (mut context, test_metadata, test_master_edition_v2) = setup(&admin).await;
-    let test_master_pass = TestPassBook::new(store, test_metadata.mint.pubkey());
+    let test_master_pass = TestPassBook::new(test_metadata.mint.pubkey());
 
     let result = test_master_pass
         .init(
@@ -118,6 +119,7 @@ async fn failure() {
             &test_master_edition_v2,
             &test_metadata,
             &admin,
+            &store,
             instruction::InitPassBookArgs {
                 name: name.clone(),
                 uri: uri.clone(),

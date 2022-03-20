@@ -21,17 +21,15 @@ use spl_token::state::Account;
 pub struct TestPassBook {
     pub pubkey: Pubkey,
     pub token_account: Keypair,
-    pub store: Pubkey,
 }
 
 impl TestPassBook {
     #[allow(clippy::new_without_default)]
-    pub fn new(store: Pubkey, mint: Pubkey) -> Self {
+    pub fn new(mint: Pubkey) -> Self {
         let (pubkey, _) = find_pass_book_program_address(&nft_pass_book::id(), &mint);
         Self {
             pubkey,
             token_account: Keypair::new(),
-            store,
         }
     }
 
@@ -47,6 +45,7 @@ impl TestPassBook {
         test_master_edition: &TestMasterEditionV2,
         test_metadata: &TestMetadata,
         user: &User,
+        store: &Pubkey,
         args: instruction::InitPassBookArgs,
     ) -> transport::Result<()> {
         let rent = context.banks_client.get_rent().await.unwrap();
@@ -64,7 +63,7 @@ impl TestPassBook {
                     &self.pubkey,
                     &user.token_account.pubkey(),
                     &self.token_account.pubkey(),
-                    &self.store,
+                    store,
                     &user.owner.pubkey(),
                     &context.payer.pubkey(),
                     &test_master_edition.mint_pubkey,

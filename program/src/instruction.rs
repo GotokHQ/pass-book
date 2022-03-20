@@ -66,7 +66,7 @@ pub enum NFTPassInstruction {
 /// Create `InitPassBook` instruction
 pub fn init_pass_book(
     program_id: &Pubkey,
-    master_pass: &Pubkey,
+    pass_book: &Pubkey,
     source: &Pubkey,
     token_account: &Pubkey,
     store: &Pubkey,
@@ -78,7 +78,7 @@ pub fn init_pass_book(
     args: InitPassBookArgs,
 ) -> Instruction {
     let accounts = vec![
-        AccountMeta::new(*master_pass, false),
+        AccountMeta::new(*pass_book, false),
         AccountMeta::new(*source, false),
         AccountMeta::new(*token_account, false),
         AccountMeta::new(*store, false),

@@ -54,6 +54,8 @@ pub struct InitPassParams {
     pub description: String,
     /// URI
     pub uri: String,
+    /// mint
+    pub mint: Pubkey,
     /// Pass book this bass belongs to
     pub pass_book: Pubkey, 
     /// pass expiration in unix timestamp
@@ -90,7 +92,7 @@ impl Pass {
     pub fn init(&mut self, params: InitPassParams) {
         self.account_type = AccountType::Pass;
         self.pass_book = params.pass_book;
-        self.owner = params.owner;
+        self.mint = params.mint;
         self.description = params.description;
         self.uri = params.uri;
         self.name = params.name;

@@ -19,7 +19,7 @@ use solana_program::pubkey::Pubkey;
 use state::{PassStore, COLLECTION_MINT, PREFIX};
 
 
-solana_program::declare_id!("passK9sjcBkUzWu35gf2x4EmpcrkZB9NXgHWtgAzxhB");
+solana_program::declare_id!("passjvPvHQWN4SvBCmHk1gdrtBvoHRERtQK9MKemreQ");
 
 /// Generates pass collection mint
 pub fn find_pass_collection_mint(program_id: &Pubkey) -> (Pubkey, u8) {
