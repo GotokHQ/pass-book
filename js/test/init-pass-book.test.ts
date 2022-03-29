@@ -4,16 +4,26 @@ import { Connection, Keypair } from '@solana/web3.js';
 import { connectionURL, createMasterEdition, killStuckProcess } from './utils';
 import { airdrop, PayerTransactionHandler } from '@metaplex-foundation/amman';
 
+import BN from 'bn.js';
+
 import { logDebug } from './utils';
 import { addLabel, isKeyOf } from './utils/address-labels';
 import { initPassBook } from './actions';
 import { DataV2 } from '@metaplex-foundation/mpl-token-metadata';
-import { AccountKey, PassBook, PassBookData, PassState, PassType, Store } from '../src/accounts';
+import {
+  AccountKey,
+  DurationType,
+  PassBook,
+  PassBookData,
+  PassBookDataArgs,
+  PassState,
+  Store,
+} from '../src/accounts';
 
 killStuckProcess();
 
 const URI = 'uri';
-const NAME = 'test';
+const NAME = 'my pass book';
 const DESCRIPTION = 'test';
 const SYMBOL = 'sym';
 const SELLER_FEE_BASIS_POINTS = 10;
@@ -24,7 +34,6 @@ test('init-pass-book-account: success', async (t) => {
 
   const connection = new Connection(connectionURL, 'confirmed');
   const transactionHandler = new PayerTransactionHandler(connection, payer);
-
   await airdrop(connection, payer.publicKey, 2);
 
   const initMetadataData = new DataV2({
@@ -42,7 +51,7 @@ test('init-pass-book-account: success', async (t) => {
     transactionHandler,
     payer,
     initMetadataData,
-    0,
+    100,
   );
   const passBookPDA = await PassBook.getPDA(master.mint.publicKey);
   const store = await Store.getPDA(payer.publicKey);
@@ -58,10 +67,10 @@ test('init-pass-book-account: success', async (t) => {
     mint: master.mint.publicKey,
     authority: payer.publicKey,
     mutable: true,
-    passType: PassType.Membership,
-    validityPeriod: 30,
+    durationType: DurationType.Days,
+    duration: new BN(30),
+    maxSupply: new BN(100),
   });
-  console.log('createTxDetails', createTxDetails);
   logDebug(createTxDetails.txSummary.logMessages.join('\n'));
 
   //   assertTransactionSummary(t, createTxDetails.txSummary, {
@@ -74,7 +83,13 @@ test('init-pass-book-account: success', async (t) => {
     passBookAccountDataBytes: passBookAccount.data.byteLength,
   });
 
-  const passBookData = PassBookData.deserialize(<Buffer>passBookAccount.data);
+  // console.log('data', JSON.stringify((<Buffer>passBookAccount.data).toJSON().data));
+  const passBookData = PassBookData.deserialize<PassBookData, PassBookDataArgs>(
+    <Buffer>passBookAccount.data,
+  );
+  t.assert(passBookData.duration.eq(new BN(30)), 'Duration invalid');
+  t.assert(passBookData.maxSupply.eq(new BN(100)), 'Max supply invalid');
+  t.assert(passBookData.totalPasses.eq(new BN(0)), 'total passes should be 0');
   spok(t, passBookData, {
     $topic: 'passBookData',
     key: AccountKey.PassBook,
@@ -84,9 +99,19 @@ test('init-pass-book-account: success', async (t) => {
     description: DESCRIPTION,
     uri: URI,
     mutable: 1,
-    passType: PassType.Membership,
+    durationType: DurationType.Days,
     passState: PassState.NotActivated,
   });
+  // console.log('authority ', payer.publicKey.toString());
+  // console.log('passBook ', passBookPDA.toString());
+  // console.log('mint ', master.mint.publicKey.toString());
+  // console.log('mutable ', true);
+  // console.log('durationType ', DurationType.Days);
+  // console.log('duration ', 30);
+  // console.log('maxSupply ', 100);
+  // console.log('name ', passBookData.name);
+  // console.log('uri ', passBookData.uri);
+  // console.log('description ', passBookData.description);
 });
 
 test('init-pass-book-account: failure', async (t) => {
@@ -130,8 +155,9 @@ test('init-pass-book-account: failure', async (t) => {
     mint: master.mint.publicKey,
     authority: payer.publicKey,
     mutable: true,
-    passType: PassType.Membership,
-    validityPeriod: 30,
+    durationType: DurationType.Days,
+    duration: new BN(30),
+    maxSupply: new BN(50),
   });
   console.log('createTxDetails', createTxDetails);
 

@@ -12,8 +12,9 @@ export enum PassState {
   Ended = 3,
 }
 
-export enum PassType {
-  Membership = 0,
-  Collection = 1,
-  Time = 2,
+export enum DurationType {
+  Minutes = 0,
+  Hours = 1,
+  Days = 2,
+  Unlimited = 3,
 }

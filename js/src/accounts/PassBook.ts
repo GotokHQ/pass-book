@@ -6,11 +6,12 @@ import {
   Account,
 } from '@metaplex-foundation/mpl-core';
 import bs58 from 'bs58';
+import BN from 'bn.js';
 import { AccountInfo, Connection, PublicKey } from '@solana/web3.js';
 import { PassBookProgram } from '../PassBookProgram';
-import { AccountKey, PassState, PassType } from './constants';
+import { AccountKey, PassState, DurationType } from './constants';
 
-type Args = {
+export type PassBookDataArgs = {
   key: AccountKey;
   mint: StringPublicKey;
   authority: StringPublicKey;
@@ -18,14 +19,13 @@ type Args = {
   description: string;
   uri: string;
   mutable: boolean;
-  passType: PassType;
-  validityPeriod: number | null;
-  collectionMint: StringPublicKey | null;
-  timeValidationAuthority: StringPublicKey | null;
-  passState: PassState;
+  durationType: DurationType;
+  duration: BN;
+  totalPasses: BN;
+  maxSupply: BN | null;
 };
 
-export class PassBookData extends Borsh.Data<Args> {
+export class PassBookData extends Borsh.Data<PassBookDataArgs> {
   static readonly SCHEMA = PassBookData.struct([
     ['key', 'u8'],
     ['authority', 'pubkeyAsString'],
@@ -34,11 +34,11 @@ export class PassBookData extends Borsh.Data<Args> {
     ['description', 'string'],
     ['uri', 'string'],
     ['mutable', 'u8'],
-    ['passType', 'u8'],
-    ['validityPeriod', { kind: 'option', type: 'u32' }],
-    ['collectionMint', { kind: 'option', type: 'pubkeyAsString' }],
-    ['timeValidationAuthority', { kind: 'option', type: 'pubkeyAsString' }],
     ['passState', 'u8'],
+    ['durationType', 'u8'],
+    ['duration', 'u64'],
+    ['totalPasses', 'u64'],
+    ['maxSupply', { kind: 'option', type: 'u64' }],
   ]);
   key: AccountKey;
   mint: StringPublicKey;
@@ -47,13 +47,13 @@ export class PassBookData extends Borsh.Data<Args> {
   description: string;
   uri: string;
   mutable: boolean;
-  passType: PassType;
-  validityPeriod?: number;
-  collectionMint?: StringPublicKey;
-  timeValidationAuthority?: StringPublicKey;
   passState: PassState;
+  durationType: DurationType;
+  duration: BN;
+  totalPasses: BN;
+  maxSupply: BN | null;
 
-  constructor(args: Args) {
+  constructor(args: PassBookDataArgs) {
     super(args);
     const REPLACE = new RegExp('\u0000', 'g');
     this.key = AccountKey.PassBook;

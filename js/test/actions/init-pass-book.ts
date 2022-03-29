@@ -2,7 +2,8 @@ import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from '@sol
 import { logDebug } from '../utils';
 import { TransactionHandler } from '@metaplex-foundation/amman';
 import * as spl from '@solana/spl-token';
-import { InitPassBook, PassBook, PassType } from '../../src/pass-book';
+import BN from 'bn.js';
+import { InitPassBook, PassBook, DurationType } from '../../src/pass-book';
 
 type InitPassBookParams = {
   passBook: PublicKey;
@@ -16,10 +17,9 @@ type InitPassBookParams = {
   mutable: boolean;
   source: PublicKey;
   store: PublicKey;
-  passType: PassType;
-  validityPeriod?: number;
-  collectionMint?: PublicKey;
-  timeValidationAuthority?: PublicKey;
+  durationType: DurationType;
+  duration: BN;
+  maxSupply: BN | null;
 };
 
 // -----------------
@@ -65,10 +65,9 @@ export async function initPassBook(
     source,
     store,
     authority,
-    passType,
-    validityPeriod,
-    collectionMint,
-    timeValidationAuthority,
+    durationType,
+    duration,
+    maxSupply,
   }: InitPassBookParams,
 ) {
   const passBook = await PassBook.getPDA(mint);
@@ -87,11 +86,10 @@ export async function initPassBook(
       masterEdition,
       source,
       store,
-      passType,
+      durationType,
       tokenAccount,
-      validityPeriod,
-      collectionMint,
-      timeValidationAuthority,
+      duration,
+      maxSupply,
     },
   );
   const createTxDetails = await transactionHandler.sendAndConfirmTransaction(initPassTx, [], {

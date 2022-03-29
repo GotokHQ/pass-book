@@ -1,4 +1,4 @@
-import { Borsh, StringPublicKey, Transaction } from '@metaplex-foundation/mpl-core';
+import { Borsh, Transaction } from '@metaplex-foundation/mpl-core';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import {
   PublicKey,
@@ -7,7 +7,8 @@ import {
   TransactionCtorFields,
   TransactionInstruction,
 } from '@solana/web3.js';
-import { PassType } from 'src/accounts/constants';
+import BN from 'bn.js';
+import { DurationType } from 'src/accounts/constants';
 import { PassBookProgram } from '../PassBookProgram';
 
 type Args = {
@@ -15,10 +16,9 @@ type Args = {
   description: string;
   uri: string;
   mutable: boolean;
-  validityPeriod: number | null;
-  collectionMint?: StringPublicKey | null;
-  timeValidationAuthority?: StringPublicKey | null;
-  passType: PassType;
+  durationType: DurationType;
+  duration: BN;
+  maxSupply: BN | null;
 };
 
 export class InitPassBookArgs extends Borsh.Data<Args> {
@@ -28,10 +28,9 @@ export class InitPassBookArgs extends Borsh.Data<Args> {
     ['description', 'string'],
     ['uri', 'string'],
     ['mutable', 'u8'],
-    ['validityPeriod', { kind: 'option', type: 'u32' }],
-    ['collectionMint', { kind: 'option', type: 'pubkeyAsString' }],
-    ['timeValidationAuthority', { kind: 'option', type: 'pubkeyAsString' }],
-    ['passType', 'u8'],
+    ['durationType', 'u8'],
+    ['duration', 'u64'],
+    ['maxSupply', { kind: 'option', type: 'u64' }],
   ]);
 
   instruction = 0;
@@ -39,10 +38,9 @@ export class InitPassBookArgs extends Borsh.Data<Args> {
   description: string;
   uri: string;
   mutable: boolean;
-  validityPeriod?: number;
-  collectionMint?: StringPublicKey;
-  timeValidationAuthority?: StringPublicKey;
-  passType: PassType;
+  duration: BN;
+  durationType: DurationType;
+  maxSupply: BN | null;
 }
 
 export type InitPassBookParams = {
@@ -57,11 +55,10 @@ export type InitPassBookParams = {
   source: PublicKey;
   passBook: PublicKey;
   mint: PublicKey;
-  validityPeriod?: number;
-  collectionMint?: PublicKey;
-  timeValidationAuthority?: PublicKey;
-  passType: PassType;
+  duration: BN;
+  durationType: DurationType;
   tokenAccount: PublicKey;
+  maxSupply: BN | null;
 };
 
 export class InitPassBook extends Transaction {
@@ -80,11 +77,10 @@ export class InitPassBook extends Transaction {
       masterMetadata,
       masterEdition,
       mint,
-      validityPeriod,
-      collectionMint,
-      timeValidationAuthority,
-      passType,
-      tokenAccount
+      durationType,
+      duration,
+      tokenAccount,
+      maxSupply,
     } = params;
 
     const data = InitPassBookArgs.serialize({
@@ -92,10 +88,9 @@ export class InitPassBook extends Transaction {
       description,
       uri,
       mutable,
-      validityPeriod,
-      collectionMint: collectionMint?.toString(),
-      timeValidationAuthority: timeValidationAuthority?.toString(),
-      passType,
+      durationType,
+      duration,
+      maxSupply
     });
     this.add(
       new TransactionInstruction({
