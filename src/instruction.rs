@@ -8,8 +8,6 @@ use solana_program::{
     system_program, sysvar,
 };
 
-use crate::state::DurationType;
-
 /// Initialize a PackSet arguments
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
@@ -23,12 +21,16 @@ pub struct InitPassBookArgs {
     pub uri: String,
     /// If true authority can make changes at deactivated phase
     pub mutable: bool,
-    /// Duration type
-    pub duration_type: DurationType,
-    /// The length of time this pass is valid for
-    pub duration: u64,
+    /// The no of days this pass can be used to access the service
+    pub access: Option<u64>,
+    /// The no of minutes consumed for each use of this pass
+    pub duration: Option<u64>,
     /// The maximum number of passes that can be printed
     pub max_supply: Option<u64>,
+    /// blur hash of image
+    pub blur_hash: Option<String>,
+    /// price
+    pub price: u64
 }
 
 /// Instruction definition
@@ -73,9 +75,13 @@ pub fn init_pass_book(
     mint: &Pubkey,
     master_metadata: &Pubkey,
     master_edition: &Pubkey,
+    price_mint: &Pubkey,
+    gate_keeper: Option<&Pubkey>,
     args: InitPassBookArgs,
+    payout_accounts: &[Pubkey],
+    payout_token_accounts: &[Pubkey]
 ) -> Instruction {
-    let accounts = vec![
+    let mut accounts = vec![
         AccountMeta::new(*pass_book, false),
         AccountMeta::new(*source, false),
         AccountMeta::new(*token_account, false),
@@ -85,10 +91,22 @@ pub fn init_pass_book(
         AccountMeta::new_readonly(*mint, false),
         AccountMeta::new_readonly(*master_metadata, false),
         AccountMeta::new_readonly(*master_edition, false),
+        AccountMeta::new_readonly(*price_mint, false),
+        AccountMeta::new_readonly(sysvar::clock::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),
         AccountMeta::new_readonly(spl_token::id(), false),
     ];
+
+    for (i, payout) in payout_accounts.iter().enumerate() {
+        accounts.push(AccountMeta::new(*payout, false));
+        accounts.push(AccountMeta::new(payout_token_accounts[i], false))
+    }
+
+    if let Some(g_keeper) = gate_keeper {
+        accounts.push(AccountMeta::new_readonly(*g_keeper, true))
+    }
+
     Instruction::new_with_borsh(
         *program_id,
         &NFTPassInstruction::InitPassBook(args),

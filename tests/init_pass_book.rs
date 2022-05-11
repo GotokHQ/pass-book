@@ -3,10 +3,13 @@ mod utils;
 use nft_pass_book::{
     error::NFTPassError,
     find_pass_store_program_address, instruction,
-    state::{AccountType, DurationType, PassBookState},
+    state::{AccountType, PassBookState},
 };
 use num_traits::FromPrimitive;
-use solana_program::instruction::InstructionError;
+use solana_program::{
+    system_program::ID as system_id,
+    instruction::InstructionError
+};
 use solana_program_test::*;
 use solana_sdk::{
     signature::Keypair, signer::Signer, transaction::TransactionError, transport::TransportError,
@@ -65,14 +68,17 @@ async fn success() {
             &test_metadata,
             &user,
             &store,
+            &system_id,
             instruction::InitPassBookArgs {
                 name: name.clone(),
                 uri: uri.clone(),
                 description: description.clone(),
                 mutable: true,
-                duration: 30, //valid for 30 days
-                duration_type: DurationType::Days,
+                duration: Some(30), //30 mins duration per session
+                access: Some(30), //valid for 30 days
                 max_supply: Some(5),
+                blur_hash: None,
+                price: 0
             },
         )
         .await
@@ -114,14 +120,17 @@ async fn failure() {
             &test_metadata,
             &admin,
             &store,
+            &system_id,
             instruction::InitPassBookArgs {
                 name: name.clone(),
                 uri: uri.clone(),
                 description: description.clone(),
                 mutable: true,
-                duration: 30, //valid for 30 days
-                duration_type: DurationType::Days,
+                duration: Some(30), //30 mins duration per session
+                access: Some(30), //valid for 30 days
                 max_supply: Some(10),
+                blur_hash: None,
+                price: 0,
             },
         )
         .await;

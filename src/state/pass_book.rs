@@ -3,7 +3,7 @@
 use super::*;
 use crate::{
     error::NFTPassError,
-    state::{MAX_DESCRIPTION_LEN, MAX_NAME_LENGTH, MAX_URI_LENGTH},
+    state::{MAX_DESCRIPTION_LEN, MAX_NAME_LENGTH, MAX_URI_LENGTH, MAX_LENGTH_IMAGE_HASH},
     math::SafeMath
 };
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -25,29 +25,19 @@ pub const MAX_PASS_BOOK_LEN: usize = 1 //account type
 + 32 // authority pub key
 + 32 // mint pub key
 + 1 // mutable
-+ 1 // period
 + 1 // pass_state
-+ 1 // duration_type
-+ 8 // duration
++ 9 // access
++ 9 // duration
 + 9 // max_supply
++ 1 + 4 + MAX_LENGTH_IMAGE_HASH //image blur hash
++ 8 // created_at
++ 8 // price
++ 32 // price_mint
++ 33 // gatekeeper
 + 128; // Padding
 
-/// Distribution type
-#[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
-pub enum DurationType {
-    Minutes,
-    Hours,
-    Days,
-    Unlimited,
-}
 
-impl Default for DurationType {
-    fn default() -> Self {
-        Self::Days
-    }
-}
-
-/// Pack state
+/// Pass state
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
 pub enum PassBookState {
     /// Not activated
@@ -66,6 +56,7 @@ impl Default for PassBookState {
     }
 }
 
+
 /// Initialize a PackSet params
 pub struct InitPassBook {
     /// Name
@@ -80,12 +71,22 @@ pub struct InitPassBook {
     pub mint: Pubkey,
     /// If true authority can make changes at deactivated phase
     pub mutable: bool,
-    /// The length of time this pass is valid for
-    pub duration: u64,
-    /// Duration type
-    pub duration_type: DurationType,
+    /// The no of days this pass can be used to access the service
+    pub access: Option<u64>,
+    /// The no of minutes consumed for each use of this pass
+    pub duration: Option<u64>,
     /// Maximum number of passes that can be minted from this pass
-    pub max_supply: Option<u64>
+    pub max_supply: Option<u64>,
+    /// blur has of image
+    pub blur_hash: Option<String>,
+    /// creation date
+    pub created_at: u64,
+    /// price
+    pub price: u64,
+    /// treasury mint
+    pub price_mint: Pubkey,
+    /// gate keeper mint
+    pub gate_keeper: Option<Pubkey>, 
 }
 
 /// Pack set
@@ -102,20 +103,31 @@ pub struct PassBook {
     pub name: String,
     /// Description
     pub description: String,
-    /// Link to pack set image
+    /// Link to pass image
     pub uri: String,
     /// If true authority can make changes at deactivated phase
     pub mutable: bool,
     /// PassBook state
     pub pass_state: PassBookState,
-    /// Duration type
-    pub duration_type: DurationType,
-    /// The length of time this pass is valid for
-    pub duration: u64,
+    /// The no of days this pass can be used to access the service
+    pub access: Option<u64>,
+    /// The no of minutes consumed for each use of this pass
+    pub duration: Option<u64>,
     /// Total number of passes created
-    pub total_passes: u64,
+    pub supply: u64,
     /// Maximum number of passes that can be minted from this pass
     pub max_supply: Option<u64>,
+    /// blur hash of image
+    pub blur_hash: Option<String>,
+    /// creation date
+    pub created_at: u64,
+    /// price
+    pub price: u64,
+    /// price mint
+    pub price_mint: Pubkey,
+    /// gate_keeper that must sign the transaction to buy or mint
+    pub gate_keeper: Option<Pubkey>,
+    
 }
 
 impl PassBook {
@@ -128,19 +140,24 @@ impl PassBook {
         self.name = params.name;
         self.mint = params.mint;
         self.mutable = params.mutable;
-        self.duration_type = params.duration_type;
         self.pass_state = PassBookState::NotActivated;
+        self.access = params.access;
         self.duration = params.duration;
-        self.max_supply = params.max_supply
+        self.blur_hash = params.blur_hash;
+        self.max_supply = params.max_supply;
+        self.created_at = params.created_at;
+        self.price = params.price;
+        self.price_mint = params.price_mint;
+        self.gate_keeper = params.gate_keeper;
     }
 
     /// Increment total passes
-    pub fn increment_total_passes(&mut self) -> Result<(), ProgramError> {
-        self.total_passes = self.total_passes.error_increment()?;
+    pub fn increment_supply(&mut self) -> Result<(), ProgramError> {
+        self.supply = self.supply.error_increment()?;
         Ok(())
     }
 
-    /// Check if pack is in activated state
+    /// Check if pas is in activated state
     pub fn assert_activated(&self) -> Result<(), ProgramError> {
         if self.pass_state != PassBookState::Activated {
             return Err(NFTPassError::PassNotActivated.into());
@@ -149,7 +166,7 @@ impl PassBook {
         Ok(())
     }
 
-    /// Check if pack is mutable and in a right state to edit data
+    /// Check if pass is mutable and in a right state to edit data
     pub fn assert_able_to_edit(&self) -> Result<(), ProgramError> {
         if !self.mutable {
             return Err(NFTPassError::ImmutablePass.into());

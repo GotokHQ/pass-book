@@ -342,7 +342,7 @@ pub fn create_pass_collection<'a>(
                 pass_authority_signer_seeds,
             )?;
 
-            msg!("New pack config account was created");
+            msg!("New pass store account was created");
 
             let mut data = PassStore::unpack_unchecked(&pass_authority_info.data.borrow_mut())?;
 

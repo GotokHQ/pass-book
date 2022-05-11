@@ -1,11 +1,14 @@
 use crate::*;
+use mpl_token_metadata::state::Metadata;
 use nft_pass_book::{
     instruction::{self},
     state::PassBook,
     find_pass_book_program_address,
+    find_payout_program_address
 };
 use solana_program::{
-    program_pack::Pack, pubkey::Pubkey, system_instruction,
+    program_pack::Pack, pubkey::Pubkey, system_instruction, 
+    system_program::ID as system_id, instruction::Instruction,
 };
 use solana_program_test::*;
 
@@ -46,9 +49,34 @@ impl TestPassBook {
         test_metadata: &TestMetadata,
         user: &User,
         store: &Pubkey,
+        price_mint: &Pubkey,
         args: instruction::InitPassBookArgs,
     ) -> transport::Result<()> {
         let rent = context.banks_client.get_rent().await.unwrap();
+        let metadata: Metadata = test_metadata.get_data(context).await;
+
+        let payout = if let Some(creators) = metadata.data.creators {
+            creators.iter().map(|creator| find_payout_program_address(&nft_pass_book::id(), &creator.address, price_mint).0).collect()
+        } else {
+            vec![]
+        };
+ 
+        let is_native = *price_mint == system_id;
+        let (token_accounts, token_accounts_pub_key) = if is_native {
+            (vec![], payout.clone())
+        } else {
+            let accounts: Vec<Keypair> = payout.iter().map(|_| Keypair::new()).collect();
+            let account_keys: Vec<Pubkey> = accounts.iter().map(|account| account.pubkey()).collect();
+            (accounts, account_keys)
+        };
+        let mut signers = vec![
+            &context.payer,
+            &self.token_account,
+            &user.owner,
+        ];
+        for account in &token_accounts {
+            signers.push(account);
+        }
         let tx = Transaction::new_signed_with_payer(
             &[
                 system_instruction::create_account(
@@ -69,15 +97,15 @@ impl TestPassBook {
                     &test_master_edition.mint_pubkey,
                     &test_metadata.pubkey,
                     &test_master_edition.pubkey,
-                    args.clone()
+                    price_mint,
+                    None,
+                    args.clone(),
+                    &payout,
+                    &token_accounts_pub_key
                 ),
             ],
             Some(&context.payer.pubkey()),
-            &[
-                &context.payer,
-                &self.token_account,
-                &user.owner,
-            ],
+            &signers,
             context.last_blockhash,
         );
 

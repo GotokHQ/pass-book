@@ -13,9 +13,9 @@ use solana_program::{
 
 pub const MAX_PASS_STORE_LEN: usize = 1+
 32 // authority mint
-+ 64 // total redeemed
-+ 64 // total edition
-+ 64 // total master edition
++ 8 // total redeemed
++ 8 // total edition
++ 8 // total master edition
 + 118; // Padding
 
 /// Pass Store

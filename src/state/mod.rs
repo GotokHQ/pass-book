@@ -5,10 +5,12 @@ use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 mod pass;
 mod store;
 mod pass_book;
+mod payout;
 
 pub use pass::*;
 pub use store::*;
 pub use pass_book::*;
+pub use payout::*;
 
 /// Global prefix for program addresses
 pub const PREFIX: &str = "passbook";
@@ -24,7 +26,9 @@ pub const MAX_URI_LENGTH: usize = 200;
 
 pub const MAX_NAME_LENGTH: usize = 32;
 
-/// Max len of pack description string
+pub const MAX_LENGTH_IMAGE_HASH: usize = 200;
+
+/// Max len of pass description string
 pub const MAX_DESCRIPTION_LEN: usize = 500;
 
 /// Enum representing the account type managed by the program
@@ -37,7 +41,9 @@ pub enum AccountType {
     /// Pass store account
     PassStore,
     /// Pass collection account
-    PassBook
+    PassBook,
+    /// Payout
+    Payout
 }
 
 impl Default for AccountType {

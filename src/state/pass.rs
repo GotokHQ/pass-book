@@ -63,7 +63,7 @@ pub struct InitPassParams {
 }
 
 
-/// Pack set
+/// Pass
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, BorshSchema, Default)]
 pub struct Pass {
@@ -75,7 +75,7 @@ pub struct Pass {
     pub pass_book: Pubkey,
     /// Description
     pub description: String,
-    /// Link to pack set image
+    /// Link to pass image
     pub uri: String,
     /// Name
     pub name: String, 
@@ -108,7 +108,7 @@ impl Pass {
     //     Ok(())
     // }
 
-    /// Check if pack is in activated state
+    /// Check if pass is in activated state
     pub fn assert_activated(&self) -> Result<(), ProgramError> {
         if self.pass_state != PassState::Activated {
             return Err(NFTPassError::PassNotActivated.into());

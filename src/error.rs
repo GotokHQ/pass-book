@@ -28,6 +28,10 @@ pub enum NFTPassError {
     #[error("InvalidStoreKey")]
     InvalidStoreKey,
 
+    /// Invalid Payout Key
+    #[error("InvalidPayoutKey")]
+    InvalidPayoutKey,
+
     /// Invalid Program Authority Key
     #[error("InvalidProgramAuthority")]
     InvalidProgramAuthority,
@@ -84,7 +88,11 @@ pub enum NFTPassError {
     #[error("Wrong max supply")]
     WrongMaxSupply,
 
-    /// Wrong durTION
+    /// Wrong validity period
+    #[error("Wrong validity period")]
+    WrongValidityPeriod,
+
+    /// Wrong duration
     #[error("Wrong duration")]
     WrongDuration,
 
