@@ -16,6 +16,10 @@ pub enum NFTPassError {
     #[error("Pass should be activated")]
     PassNotActivated,
 
+    /// Can't set the same value
+    #[error("Can't set the same value")]
+    CantSetTheSameValue,
+
     /// Invalid Authority
     #[error("InvalidAuthorityKey")]
     InvalidAuthorityKey,
@@ -23,6 +27,10 @@ pub enum NFTPassError {
     /// Invalid Mint Key
     #[error("InvalidMintKey")]
     InvalidMintKey,
+
+    /// Invalid Update Authority Key
+    #[error("InvalidUpdateAuthorityKey")]
+    InvalidUpdateAuthorityKey,
 
     /// Invalid PassStore Key
     #[error("InvalidStoreKey")]
@@ -42,7 +50,7 @@ pub enum NFTPassError {
 
     /// Pass is immutable
     #[error("Pass is immutable")]
-    ImmutablePass,
+    ImmutablePassBook,
 
     /// Overflow
     #[error("Overflow")]
@@ -76,8 +84,8 @@ pub enum NFTPassError {
     #[error("URI too long")]
     UriTooLong,
 
-    /// Pack description too long
-    #[error("Pack description too long")]
+    /// Description too long
+    #[error("Description too long")]
     DescriptionTooLong,
 
     /// Invalid seller basis point

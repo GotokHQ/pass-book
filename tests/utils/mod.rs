@@ -18,7 +18,7 @@ use solana_sdk::{
 };
 use spl_token::state::Mint;
 
-pub fn gtk_packs_program_test<'a>() -> ProgramTest {
+pub fn nft_pass_book_program_test<'a>() -> ProgramTest {
     let mut program = ProgramTest::new("nft_pass_book", nft_pass_book::id(), None);
     program.add_program("mpl_token_metadata", mpl_token_metadata::id(), None);
     program

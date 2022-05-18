@@ -2,13 +2,14 @@
 
 
 use init_pass_book::init_pass_book;
+use edit_pass_book::edit_pass_book;
 use borsh::BorshDeserialize;
 use crate::instruction::NFTPassInstruction;
 
 use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, msg, pubkey::Pubkey};
 
 pub mod init_pass_book;
-
+pub mod edit_pass_book;
 pub struct Processor {}
 
 impl Processor {
@@ -24,6 +25,10 @@ impl Processor {
             NFTPassInstruction::InitPassBook(args) => {
                 msg!("Instruction: InitPassBook");
                 init_pass_book(program_id, accounts, args)
+            },
+            NFTPassInstruction::EditPassBook(args) => {
+                msg!("Instruction: EdittPassBook");
+                edit_pass_book(program_id, accounts, args)
             }
         }
     }

@@ -17,7 +17,7 @@ use solana_sdk::{
 use utils::*;
 
 async fn setup(user: &User) -> (ProgramTestContext, TestMetadata, TestMasterEditionV2) {
-    let mut context = gtk_packs_program_test().start_with_context().await;
+    let mut context = nft_pass_book_program_test().start_with_context().await;
 
     let test_metadata = TestMetadata::new();
     let test_master_edition = TestMasterEditionV2::new(&test_metadata);

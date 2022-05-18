@@ -168,6 +168,11 @@ pub fn init_pass_book(
         &master_metadata.mint,
         Some(NFTPassError::InvalidMintKey),
     )?;
+    // assert_account_key(
+    //     pass_book_info,
+    //     &master_metadata.update_authority,
+    //     Some(NFTPassError::InvalidUpdateAuthorityKey),
+    // )?;
     assert_derivation(
         &token_metadata_program_id,
         master_edition_info,

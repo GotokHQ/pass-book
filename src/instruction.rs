@@ -30,7 +30,25 @@ pub struct InitPassBookArgs {
     /// blur hash of image
     pub blur_hash: Option<String>,
     /// price
-    pub price: u64
+    pub price: u64,
+}
+
+/// Edit a PassBook arguments
+#[repr(C)]
+#[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
+pub struct EditPassBookArgs {
+    /// Name
+    pub name: Option<String>,
+    /// Description
+    pub description: Option<String>,
+    /// URI
+    pub uri: Option<String>,
+    /// Blurhash
+    pub blur_hash: Option<String>,
+    /// Price
+    pub price: Option<u64>,
+    /// If true authority can make changes at deactivated phase
+    pub mutable: Option<bool>,
 }
 
 /// Instruction definition
@@ -54,13 +72,28 @@ pub enum NFTPassInstruction {
     ///   10. `[]` Rent info
     ///
     /// Parameters:
-    /// - name	[u8; 32]
+    /// - name	String
     /// - description String
     /// - URI String
     /// - mutable	bool
     /// - period    Period
     /// - max_num_uses    Option<u64>    InitPassBook()
     InitPassBook(InitPassBookArgs),
+
+    /// EditPassBook
+    ///
+    /// Edit pass book.
+    ///
+    /// Accounts:
+    ///   0.  `[writable]` Pass book account with address as pda of (PDA ['pass', program id, master metadata mint id] )
+    ///   1.  `[signer]` Authority of pass account
+    ///
+    /// Parameters:
+    /// - name Option<String>
+    /// - description Option<String>
+    /// - URI Option<String>
+    /// - mutable	Option<bool> (only can be changed from true to false)
+    EditPassBook(EditPassBookArgs),
 }
 
 /// Create `InitPassBook` instruction
@@ -79,7 +112,7 @@ pub fn init_pass_book(
     gate_keeper: Option<&Pubkey>,
     args: InitPassBookArgs,
     payout_accounts: &[Pubkey],
-    payout_token_accounts: &[Pubkey]
+    payout_token_accounts: &[Pubkey],
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(*pass_book, false),
@@ -110,6 +143,30 @@ pub fn init_pass_book(
     Instruction::new_with_borsh(
         *program_id,
         &NFTPassInstruction::InitPassBook(args),
+        accounts,
+    )
+}
+
+/// Create `EditPassBook` instruction
+pub fn edit_pass_book(
+    program_id: &Pubkey,
+    pass_book: &Pubkey,
+    authority: &Pubkey,
+    price_mint: Option<&Pubkey>,
+    args: EditPassBookArgs,
+) -> Instruction {
+    let mut accounts = vec![
+        AccountMeta::new(*pass_book, false),
+        AccountMeta::new_readonly(*authority, true),
+    ];
+
+    if let Some(new_price_mint) = price_mint {
+        accounts.push(AccountMeta::new_readonly(*new_price_mint, false))
+    }
+
+    Instruction::new_with_borsh(
+        *program_id,
+        &NFTPassInstruction::EditPassBook(args),
         accounts,
     )
 }

@@ -1,23 +1,17 @@
 use crate::*;
 use mpl_token_metadata::state::Metadata;
 use nft_pass_book::{
-    instruction::{self},
+    find_pass_book_program_address, find_payout_program_address,
+    instruction::{self, EditPassBookArgs},
     state::PassBook,
-    find_pass_book_program_address,
-    find_payout_program_address
 };
 use solana_program::{
-    program_pack::Pack, pubkey::Pubkey, system_instruction, 
-    system_program::ID as system_id, instruction::Instruction,
+    program_pack::Pack, pubkey::Pubkey, system_instruction,
+    system_program::ID as system_id,
 };
 use solana_program_test::*;
 
-use solana_sdk::{
-    signature::Keypair,
-    signer::Signer,
-    transaction::{Transaction},
-    transport,
-};
+use solana_sdk::{signature::Keypair, signer::Signer, transaction::Transaction, transport};
 use spl_token::state::Account;
 
 #[derive(Debug)]
@@ -41,6 +35,40 @@ impl TestPassBook {
         PassBook::unpack_unchecked(&account.data).unwrap()
     }
 
+    pub async fn edit(
+        &self,
+        context: &mut ProgramTestContext,
+        user: &User,
+        mutable: Option<bool>,
+        name: Option<String>,
+        description: Option<String>,
+        uri: Option<String>,
+        price: Option<u64>,
+        blur_hash: Option<String>,
+        price_mint: Option<&Pubkey>,
+    ) -> transport::Result<()> {
+        let tx = Transaction::new_signed_with_payer(
+            &[instruction::edit_pass_book(
+                &nft_pass_book::id(),
+                &self.pubkey,
+                &user.owner.pubkey(),
+                price_mint,
+                EditPassBookArgs {
+                    name,
+                    description,
+                    uri,
+                    blur_hash,
+                    price,
+                    mutable,
+                },
+            )],
+            Some(&context.payer.pubkey()),
+            &[&user.owner, &context.payer],
+            context.last_blockhash,
+        );
+
+        context.banks_client.process_transaction(tx).await
+    }
 
     pub async fn init(
         &self,
@@ -56,24 +84,27 @@ impl TestPassBook {
         let metadata: Metadata = test_metadata.get_data(context).await;
 
         let payout = if let Some(creators) = metadata.data.creators {
-            creators.iter().map(|creator| find_payout_program_address(&nft_pass_book::id(), &creator.address, price_mint).0).collect()
+            creators
+                .iter()
+                .map(|creator| {
+                    find_payout_program_address(&nft_pass_book::id(), &creator.address, price_mint)
+                        .0
+                })
+                .collect()
         } else {
             vec![]
         };
- 
+
         let is_native = *price_mint == system_id;
         let (token_accounts, token_accounts_pub_key) = if is_native {
             (vec![], payout.clone())
         } else {
             let accounts: Vec<Keypair> = payout.iter().map(|_| Keypair::new()).collect();
-            let account_keys: Vec<Pubkey> = accounts.iter().map(|account| account.pubkey()).collect();
+            let account_keys: Vec<Pubkey> =
+                accounts.iter().map(|account| account.pubkey()).collect();
             (accounts, account_keys)
         };
-        let mut signers = vec![
-            &context.payer,
-            &self.token_account,
-            &user.owner,
-        ];
+        let mut signers = vec![&context.payer, &self.token_account, &user.owner];
         for account in &token_accounts {
             signers.push(account);
         }
@@ -101,7 +132,7 @@ impl TestPassBook {
                     None,
                     args.clone(),
                     &payout,
-                    &token_accounts_pub_key
+                    &token_accounts_pub_key,
                 ),
             ],
             Some(&context.payer.pubkey()),

@@ -169,7 +169,7 @@ impl PassBook {
     /// Check if pass is mutable and in a right state to edit data
     pub fn assert_able_to_edit(&self) -> Result<(), ProgramError> {
         if !self.mutable {
-            return Err(NFTPassError::ImmutablePass.into());
+            return Err(NFTPassError::ImmutablePassBook.into());
         }
 
         if self.pass_state == PassBookState::Activated {
