@@ -107,6 +107,18 @@ pub enum NFTPassError {
     /// Master edition should have unlimited supply
     #[error("Master edition should have unlimited supply")]
     WrongMasterSupply,
+
+    /// Invalid Token Account Key
+    #[error("InvalidTokenAccountKey")]
+    InvalidTokenAccountKey,
+
+    /// Pass book is already activated
+    #[error("PassBookIsAlreadyActivated")]
+    PassBookIsAlreadyActivated,
+
+    /// Pass book is already deactivated
+    #[error("PassBookIsAlreadyDeactivated")]
+    PassBookIsAlreadyDeactivated,
 }
 
 impl From<NFTPassError> for ProgramError {

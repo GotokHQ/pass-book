@@ -1,6 +1,7 @@
 mod utils;
-
-use nft_pass_book::{error::NFTPassError, find_pass_store_program_address, instruction};
+use nft_pass_book::{
+    error::NFTPassError, find_pass_store_program_address, instruction, state::PassBookState,
+};
 use num_traits::FromPrimitive;
 use solana_program::{instruction::InstructionError, system_program::ID as system_id};
 use solana_program_test::*;
@@ -10,7 +11,7 @@ use solana_sdk::{
 use utils::*;
 
 async fn setup(
-    mutable: bool,
+    activate: bool,
 ) -> (
     ProgramTestContext,
     TestMetadata,
@@ -65,7 +66,7 @@ async fn setup(
                 name: name.clone(),
                 uri: uri.clone(),
                 description: description.clone(),
-                mutable: mutable,
+                mutable: false,
                 duration: Some(30), //30 mins duration per session
                 access: Some(30),   //valid for 30 days
                 max_supply: Some(5),
@@ -76,6 +77,12 @@ async fn setup(
         .await
         .unwrap();
 
+    if activate {
+        test_master_pass
+            .activate(&mut context, &user)
+            .await
+            .unwrap();
+    }
     (
         context,
         test_metadata,
@@ -90,80 +97,40 @@ async fn success() {
     let (mut context, _test_metadata, _test_master_edition_v2, test_pass_book, user) =
         setup(true).await;
 
-    assert_eq!(
-        test_pass_book
-            .get_data(&mut context)
-            .await
-            .name
-            .trim_matches(char::from(0)),
-        String::from("Pass Name")
-    );
-
     test_pass_book
-        .edit(
-            &mut context,
-            &user,
-            Some(false),
-            Some(String::from("New Pass Name")),
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
+        .deactivate(&mut context, &user)
         .await
         .unwrap();
-
     let pass_book = test_pass_book.get_data(&mut context).await;
 
-    assert_eq!(
-        pass_book.name.trim_matches(char::from(0)),
-        String::from("New Pass Name")
-    );
-    assert_eq!(pass_book.mutable, false);
+    assert_eq!(pass_book.state, PassBookState::Deactivated);
 }
 
 #[tokio::test]
 async fn failure() {
-    let name = String::from("Pass Name");
     let (mut context, _test_metadata, _test_master_edition_v2, test_pass_book, user) =
         setup(true).await;
 
-    let result = test_pass_book
-        .edit(
-            &mut context,
-            &user,
-            Some(false),
-            Some(name),
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .await;
+    test_pass_book
+        .deactivate(&mut context, &user)
+        .await
+        .unwrap();
+    context.warp_to_slot(3).unwrap();
 
-    assert_custom_error!(result.unwrap_err(), NFTPassError::CantSetTheSameValue, 0);
+    let result = test_pass_book.deactivate(&mut context, &user).await;
+    assert_custom_error!(
+        result.unwrap_err(),
+        NFTPassError::PassBookIsAlreadyDeactivated,
+        0
+    );
 }
 
 #[tokio::test]
-async fn fail_immutable() {
+async fn failure_invalid_state() {
     let (mut context, _test_metadata, _test_master_edition_v2, test_pass_book, user) =
         setup(false).await;
 
-    let result = test_pass_book
-        .edit(
-            &mut context,
-            &user,
-            None,
-            Some(String::from("New Pass Name")),
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .await;
+    let result = test_pass_book.deactivate(&mut context, &user).await;
 
-    assert_custom_error!(result.unwrap_err(), NFTPassError::ImmutablePassBook, 0);
+    assert_custom_error!(result.unwrap_err(), NFTPassError::PassNotActivated, 0);
 }

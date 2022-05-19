@@ -82,7 +82,7 @@ pub struct Pass {
     /// pass expiration in unix timestamp
     pub expires_at: Option<u64>,
     /// Pass state
-    pub pass_state: PassState 
+    pub state: PassState 
 }
 
 
@@ -97,7 +97,7 @@ impl Pass {
         self.uri = params.uri;
         self.name = params.name;
         self.expires_at = params.expires_at;
-        self.pass_state = PassState::NotActivated;
+        self.state = PassState::NotActivated;
     }
 
     // /// Decrement supply value
@@ -110,7 +110,7 @@ impl Pass {
 
     /// Check if pass is in activated state
     pub fn assert_activated(&self) -> Result<(), ProgramError> {
-        if self.pass_state != PassState::Activated {
+        if self.state != PassState::Activated {
             return Err(NFTPassError::PassNotActivated.into());
         }
 

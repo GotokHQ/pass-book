@@ -25,7 +25,7 @@ pub const MAX_PASS_BOOK_LEN: usize = 1 //account type
 + 32 // authority pub key
 + 32 // mint pub key
 + 1 // mutable
-+ 1 // pass_state
++ 1 // state
 + 9 // access
 + 9 // duration
 + 9 // max_supply
@@ -33,6 +33,7 @@ pub const MAX_PASS_BOOK_LEN: usize = 1 //account type
 + 8 // created_at
 + 8 // price
 + 32 // price_mint
++ 32 // token
 + 33 // gatekeeper
 + 128; // Padding
 
@@ -46,8 +47,6 @@ pub enum PassBookState {
     Activated,
     /// Deactivated
     Deactivated,
-    /// Ended
-    Ended,
 }
 
 impl Default for PassBookState {
@@ -85,6 +84,8 @@ pub struct InitPassBook {
     pub price: u64,
     /// treasury mint
     pub price_mint: Pubkey,
+    /// token
+    pub token: Pubkey,
     /// gate keeper mint
     pub gate_keeper: Option<Pubkey>, 
 }
@@ -108,7 +109,7 @@ pub struct PassBook {
     /// If true authority can make changes at deactivated phase
     pub mutable: bool,
     /// PassBook state
-    pub pass_state: PassBookState,
+    pub state: PassBookState,
     /// The no of days this pass can be used to access the service
     pub access: Option<u64>,
     /// The no of minutes consumed for each use of this pass
@@ -125,6 +126,8 @@ pub struct PassBook {
     pub price: u64,
     /// price mint
     pub price_mint: Pubkey,
+    /// token
+    pub token: Pubkey,
     /// gate_keeper that must sign the transaction to buy or mint
     pub gate_keeper: Option<Pubkey>,
     
@@ -140,7 +143,7 @@ impl PassBook {
         self.name = params.name;
         self.mint = params.mint;
         self.mutable = params.mutable;
-        self.pass_state = PassBookState::NotActivated;
+        self.state = PassBookState::NotActivated;
         self.access = params.access;
         self.duration = params.duration;
         self.blur_hash = params.blur_hash;
@@ -148,6 +151,7 @@ impl PassBook {
         self.created_at = params.created_at;
         self.price = params.price;
         self.price_mint = params.price_mint;
+        self.token = params.token;
         self.gate_keeper = params.gate_keeper;
     }
 
@@ -159,7 +163,7 @@ impl PassBook {
 
     /// Check if pas is in activated state
     pub fn assert_activated(&self) -> Result<(), ProgramError> {
-        if self.pass_state != PassBookState::Activated {
+        if self.state != PassBookState::Activated {
             return Err(NFTPassError::PassNotActivated.into());
         }
 
@@ -172,7 +176,7 @@ impl PassBook {
             return Err(NFTPassError::ImmutablePassBook.into());
         }
 
-        if self.pass_state == PassBookState::Activated {
+        if self.state == PassBookState::Activated {
             return Err(NFTPassError::WrongPassState.into());
         }
 

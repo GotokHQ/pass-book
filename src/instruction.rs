@@ -54,6 +54,49 @@ pub struct EditPassBookArgs {
 /// Instruction definition
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub enum NFTPassInstruction {
+    /// ActivatePassBook
+    ///
+    /// Set pack state to "Activated"
+    ///
+    /// Accounts:
+    ///   0.  `[writable]` Pass book account with address as pda of (PDA ['pass', program id, master metadata mint id] )
+    ///   1.  `[signer]` Authority of pass book account
+    ActivatePassBook,
+    /// DeletePass Book
+    ///
+    /// Transfer all the SOL from pass book account to refunder account and thus remove it.
+    ///
+    /// Accounts:
+    ///   0.  `[writable]` Pass book account with address as pda of (PDA ['pass', program id, master metadata mint id] )
+    ///   1.  `[signer]` Authority of pass book account
+    ///   2.  `[writable]` Refunder
+    ///   3.  `[writable]` New master edition owner
+    ///   4.  `[writable]` Token account owned by pass book that holds the master edition
+    ///   5.  `[]` Rent
+    ///   6.  `[]` SPL Token Program
+    DeletePassBook,
+    /// DeactivatePassBook
+    ///
+    /// Set pack state to "Deactivated"
+    ///
+    /// Accounts:
+    ///   0.  `[writable]` Pass book account with address as pda of (PDA ['pass', program id, master metadata mint id] )
+    ///   1.  `[signer]` Authority of pass book account
+    DeactivatePassBook,
+    /// EditPassBook
+    ///
+    /// Edit pass book.
+    ///
+    /// Accounts:
+    ///   0.  `[writable]` Pass book account with address as pda of (PDA ['pass', program id, master metadata mint id] )
+    ///   1.  `[signer]` Authority of pass book account
+    ///
+    /// Parameters:
+    /// - name Option<String>
+    /// - description Option<String>
+    /// - URI Option<String>
+    /// - mutable	Option<bool> (only can be changed from true to false)
+    EditPassBook(EditPassBookArgs),
     /// InitPassBook
     ///
     /// Initialize created account.
@@ -79,21 +122,56 @@ pub enum NFTPassInstruction {
     /// - period    Period
     /// - max_num_uses    Option<u64>    InitPassBook()
     InitPassBook(InitPassBookArgs),
+}
 
-    /// EditPassBook
-    ///
-    /// Edit pass book.
-    ///
-    /// Accounts:
-    ///   0.  `[writable]` Pass book account with address as pda of (PDA ['pass', program id, master metadata mint id] )
-    ///   1.  `[signer]` Authority of pass account
-    ///
-    /// Parameters:
-    /// - name Option<String>
-    /// - description Option<String>
-    /// - URI Option<String>
-    /// - mutable	Option<bool> (only can be changed from true to false)
-    EditPassBook(EditPassBookArgs),
+/// Create `ActivatePassBook` instruction
+pub fn activate_pass_book(
+    program_id: &Pubkey,
+    pass_book: &Pubkey,
+    authority: &Pubkey,
+) -> Instruction {
+    let accounts = vec![
+        AccountMeta::new(*pass_book, false),
+        AccountMeta::new_readonly(*authority, true),
+    ];
+
+    Instruction::new_with_borsh(*program_id, &NFTPassInstruction::ActivatePassBook, accounts)
+}
+
+/// Create `DeactivatePassBook` instruction
+pub fn deactivate_pass_book(
+    program_id: &Pubkey,
+    pass_book: &Pubkey,
+    authority: &Pubkey,
+) -> Instruction {
+    let accounts = vec![
+        AccountMeta::new(*pass_book, false),
+        AccountMeta::new_readonly(*authority, true),
+    ];
+
+    Instruction::new_with_borsh(*program_id, &NFTPassInstruction::DeactivatePassBook, accounts)
+}
+
+/// Create `DeletePassBook` instruction
+pub fn delete_pass_book(
+    program_id: &Pubkey,
+    pass_book: &Pubkey,
+    authority: &Pubkey,
+    refunder: &Pubkey,
+    new_master_edition_owner: &Pubkey,
+    token_account: &Pubkey,
+) -> Instruction {
+    let accounts = vec![
+        AccountMeta::new(*pass_book, false),
+        AccountMeta::new_readonly(*authority, true),
+        AccountMeta::new(*refunder, false),
+        AccountMeta::new(*new_master_edition_owner, false),
+        AccountMeta::new(*token_account, false),
+        AccountMeta::new_readonly(sysvar::rent::id(), false),
+        AccountMeta::new_readonly(spl_token::id(), false),
+    ];
+
+    Instruction::new_with_borsh(*program_id, &NFTPassInstruction::DeletePassBook, accounts)
 }
 
 /// Create `InitPassBook` instruction

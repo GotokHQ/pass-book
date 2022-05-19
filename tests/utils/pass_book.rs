@@ -6,8 +6,7 @@ use nft_pass_book::{
     state::PassBook,
 };
 use solana_program::{
-    program_pack::Pack, pubkey::Pubkey, system_instruction,
-    system_program::ID as system_id,
+    program_pack::Pack, pubkey::Pubkey, system_instruction, system_program::ID as system_id,
 };
 use solana_program_test::*;
 
@@ -28,6 +27,44 @@ impl TestPassBook {
             pubkey,
             token_account: Keypair::new(),
         }
+    }
+
+    pub async fn activate(
+        &self,
+        context: &mut ProgramTestContext,
+        user: &User,
+    ) -> transport::Result<()> {
+        let tx = Transaction::new_signed_with_payer(
+            &[instruction::activate_pass_book(
+                &nft_pass_book::id(),
+                &self.pubkey,
+                &user.owner.pubkey(),
+            )],
+            Some(&context.payer.pubkey()),
+            &[&user.owner, &context.payer],
+            context.last_blockhash,
+        );
+
+        context.banks_client.process_transaction(tx).await
+    }
+
+    pub async fn deactivate(
+        &self,
+        context: &mut ProgramTestContext,
+        user: &User,
+    ) -> transport::Result<()> {
+        let tx = Transaction::new_signed_with_payer(
+            &[instruction::deactivate_pass_book(
+                &nft_pass_book::id(),
+                &self.pubkey,
+                &user.owner.pubkey(),
+            )],
+            Some(&context.payer.pubkey()),
+            &[&user.owner, &context.payer],
+            context.last_blockhash,
+        );
+
+        context.banks_client.process_transaction(tx).await
     }
 
     pub async fn get_data(&self, context: &mut ProgramTestContext) -> PassBook {
@@ -61,6 +98,31 @@ impl TestPassBook {
                     price,
                     mutable,
                 },
+            )],
+            Some(&context.payer.pubkey()),
+            &[&user.owner, &context.payer],
+            context.last_blockhash,
+        );
+
+        context.banks_client.process_transaction(tx).await
+    }
+
+    pub async fn delete(
+        &self,
+        context: &mut ProgramTestContext,
+        user: &User,
+        refunder: &Pubkey,
+        new_master_edition_owner_token_acc: &Pubkey,
+        token_acc: &Pubkey,
+    ) -> transport::Result<()> {
+        let tx = Transaction::new_signed_with_payer(
+            &[instruction::delete_pass_book(
+                &nft_pass_book::id(),
+                &self.pubkey,
+                &&user.owner.pubkey(),
+                refunder,
+                new_master_edition_owner_token_acc,
+                token_acc,
             )],
             Some(&context.payer.pubkey()),
             &[&user.owner, &context.payer],

@@ -90,80 +90,16 @@ async fn success() {
     let (mut context, _test_metadata, _test_master_edition_v2, test_pass_book, user) =
         setup(true).await;
 
-    assert_eq!(
-        test_pass_book
-            .get_data(&mut context)
-            .await
-            .name
-            .trim_matches(char::from(0)),
-        String::from("Pass Name")
-    );
-
     test_pass_book
-        .edit(
+        .delete(
             &mut context,
             &user,
-            Some(false),
-            Some(String::from("New Pass Name")),
-            None,
-            None,
-            None,
-            None,
-            None,
+            &user.pubkey(),
+            &user.token_account.pubkey(),
+            &test_pass_book.token_account.pubkey(),
         )
         .await
         .unwrap();
 
-    let pass_book = test_pass_book.get_data(&mut context).await;
-
-    assert_eq!(
-        pass_book.name.trim_matches(char::from(0)),
-        String::from("New Pass Name")
-    );
-    assert_eq!(pass_book.mutable, false);
-}
-
-#[tokio::test]
-async fn failure() {
-    let name = String::from("Pass Name");
-    let (mut context, _test_metadata, _test_master_edition_v2, test_pass_book, user) =
-        setup(true).await;
-
-    let result = test_pass_book
-        .edit(
-            &mut context,
-            &user,
-            Some(false),
-            Some(name),
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .await;
-
-    assert_custom_error!(result.unwrap_err(), NFTPassError::CantSetTheSameValue, 0);
-}
-
-#[tokio::test]
-async fn fail_immutable() {
-    let (mut context, _test_metadata, _test_master_edition_v2, test_pass_book, user) =
-        setup(false).await;
-
-    let result = test_pass_book
-        .edit(
-            &mut context,
-            &user,
-            None,
-            Some(String::from("New Pass Name")),
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .await;
-
-    assert_custom_error!(result.unwrap_err(), NFTPassError::ImmutablePassBook, 0);
+    assert!(is_empty_account(&mut context, &test_pass_book.pubkey).await);
 }

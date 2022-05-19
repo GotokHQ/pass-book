@@ -463,3 +463,15 @@ pub fn create_associated_token_account_raw<'a>(
         ],
     )
 }
+
+/// transfer all the SOL from source to receiver
+pub fn empty_account_balance(
+    source: &AccountInfo,
+    receiver: &AccountInfo,
+) -> Result<(), ProgramError> {
+    let mut from = source.try_borrow_mut_lamports()?;
+    let mut to = receiver.try_borrow_mut_lamports()?;
+    **to += **from;
+    **from = 0;
+    Ok(())
+}

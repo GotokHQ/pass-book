@@ -16,14 +16,15 @@ use solana_program::{
 
 /// Process EditPassBook instruction
 pub fn edit_pass_book(
-    _program_id: &Pubkey,
+    program_id: &Pubkey,
     accounts: &[AccountInfo],
     args: EditPassBookArgs,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let pass_book_account = next_account_info(account_info_iter)?;
     let authority_account = next_account_info(account_info_iter)?;
-
+    
+    assert_owned_by(pass_book_account, program_id)?;
     assert_signer(&authority_account)?;
 
     let price_mint_account = next_account_info(account_info_iter).ok();

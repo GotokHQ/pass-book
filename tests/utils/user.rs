@@ -1,4 +1,3 @@
-use super::create_token_account;
 use crate::*;
 use solana_program::pubkey::Pubkey;
 use solana_program_test::ProgramTestContext;

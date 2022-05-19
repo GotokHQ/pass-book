@@ -255,6 +255,7 @@ pub fn init_pass_book(
         price: args.price,
         price_mint: *price_mint_info.key,
         gate_keeper: gate_keeper,
+        token: *token_account_info.key,
     });
 
     pass_book.puff_out_data_fields();
@@ -369,9 +370,7 @@ pub fn create_payout_account<'a>(
                             )?;
                         }
 
-                        let mut payout = Payout::unpack_unchecked(
-                            &data,
-                        )?;
+                        let mut payout = Payout::unpack_unchecked(&data)?;
 
                         payout.init(
                             *current_creator_payout_info.key,

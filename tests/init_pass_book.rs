@@ -93,7 +93,7 @@ async fn success() {
     );
     assert_eq!(master_pass.account_type, AccountType::PassBook);
     assert!(master_pass.mutable);
-    assert_eq!(master_pass.pass_state, PassBookState::NotActivated);
+    assert_eq!(master_pass.state, PassBookState::NotActivated);
     assert_eq!(master_pass.authority, user.owner.pubkey());
 }
 
