@@ -106,5 +106,5 @@ async fn failure() {
     context.warp_to_slot(3).unwrap();
 
     let result = test_pass_book.activate(&mut context, &user).await;
-    assert_custom_error!(result.unwrap_err(), NFTPassError::PassBookIsAlreadyActivated, 0);
+    assert_custom_error!(result.unwrap_err().unwrap(), NFTPassError::PassBookIsAlreadyActivated, 0);
 }

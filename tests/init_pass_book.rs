@@ -12,7 +12,7 @@ use solana_program::{
 };
 use solana_program_test::*;
 use solana_sdk::{
-    signature::Keypair, signer::Signer, transaction::TransactionError, transport::TransportError,
+    signature::Keypair, signer::Signer, transaction::TransactionError
 };
 use utils::*;
 
@@ -28,7 +28,7 @@ async fn setup(user: &User) -> (ProgramTestContext, TestMetadata, TestMasterEdit
             "Test".to_string(),
             "TST".to_string(),
             "uri".to_string(),
-            None,
+            Some(&user.owner),
             10,
             false,
             &user.token_account,
@@ -134,5 +134,5 @@ async fn failure() {
             },
         )
         .await;
-    assert_custom_error!(result.unwrap_err(), NFTPassError::InvalidStoreKey, 1);
+    assert_custom_error!(result.unwrap_err().unwrap(), NFTPassError::InvalidStoreKey, 1);
 }

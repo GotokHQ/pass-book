@@ -10,7 +10,7 @@ use solana_program::{
 };
 use solana_program_test::*;
 
-use solana_sdk::{signature::Keypair, signer::Signer, transaction::Transaction, transport};
+use solana_sdk::{signature::Keypair, signer::Signer, transaction::Transaction};
 use spl_token::state::Account;
 
 #[derive(Debug)]
@@ -33,7 +33,7 @@ impl TestPassBook {
         &self,
         context: &mut ProgramTestContext,
         user: &User,
-    ) -> transport::Result<()> {
+    ) -> Result<(), BanksClientError> {
         let tx = Transaction::new_signed_with_payer(
             &[instruction::activate_pass_book(
                 &nft_pass_book::id(),
@@ -52,7 +52,7 @@ impl TestPassBook {
         &self,
         context: &mut ProgramTestContext,
         user: &User,
-    ) -> transport::Result<()> {
+    ) -> Result<(), BanksClientError> {
         let tx = Transaction::new_signed_with_payer(
             &[instruction::deactivate_pass_book(
                 &nft_pass_book::id(),
@@ -83,7 +83,7 @@ impl TestPassBook {
         price: Option<u64>,
         blur_hash: Option<String>,
         price_mint: Option<&Pubkey>,
-    ) -> transport::Result<()> {
+    ) -> Result<(), BanksClientError> {
         let tx = Transaction::new_signed_with_payer(
             &[instruction::edit_pass_book(
                 &nft_pass_book::id(),
@@ -112,17 +112,19 @@ impl TestPassBook {
         context: &mut ProgramTestContext,
         user: &User,
         refunder: &Pubkey,
-        new_master_edition_owner_token_acc: &Pubkey,
         token_acc: &Pubkey,
-    ) -> transport::Result<()> {
+        mint: &Pubkey,
+        new_master_edition_owner_token_acc: Option<&Pubkey>,
+    ) -> Result<(), BanksClientError> {
         let tx = Transaction::new_signed_with_payer(
             &[instruction::delete_pass_book(
                 &nft_pass_book::id(),
                 &self.pubkey,
                 &&user.owner.pubkey(),
                 refunder,
-                new_master_edition_owner_token_acc,
                 token_acc,
+                mint,
+                new_master_edition_owner_token_acc,
             )],
             Some(&context.payer.pubkey()),
             &[&user.owner, &context.payer],
@@ -141,7 +143,7 @@ impl TestPassBook {
         store: &Pubkey,
         price_mint: &Pubkey,
         args: instruction::InitPassBookArgs,
-    ) -> transport::Result<()> {
+    ) -> Result<(), BanksClientError> {
         let rent = context.banks_client.get_rent().await.unwrap();
         let metadata: Metadata = test_metadata.get_data(context).await;
 

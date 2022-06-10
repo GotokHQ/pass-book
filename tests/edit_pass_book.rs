@@ -5,7 +5,7 @@ use num_traits::FromPrimitive;
 use solana_program::{instruction::InstructionError, system_program::ID as system_id};
 use solana_program_test::*;
 use solana_sdk::{
-    signature::Keypair, signer::Signer, transaction::TransactionError, transport::TransportError,
+    signature::Keypair, signer::Signer, transaction::TransactionError,
 };
 use utils::*;
 
@@ -143,7 +143,7 @@ async fn failure() {
         )
         .await;
 
-    assert_custom_error!(result.unwrap_err(), NFTPassError::CantSetTheSameValue, 0);
+    assert_custom_error!(result.unwrap_err().unwrap(), NFTPassError::CantSetTheSameValue, 0);
 }
 
 #[tokio::test]
@@ -165,5 +165,5 @@ async fn fail_immutable() {
         )
         .await;
 
-    assert_custom_error!(result.unwrap_err(), NFTPassError::ImmutablePassBook, 0);
+    assert_custom_error!(result.unwrap_err().unwrap(), NFTPassError::ImmutablePassBook, 0);
 }

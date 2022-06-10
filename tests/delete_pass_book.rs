@@ -1,11 +1,10 @@
 mod utils;
 
-use nft_pass_book::{error::NFTPassError, find_pass_store_program_address, instruction};
-use num_traits::FromPrimitive;
-use solana_program::{instruction::InstructionError, system_program::ID as system_id};
+use nft_pass_book::{find_pass_store_program_address, instruction};
+use solana_program::{system_program::ID as system_id};
 use solana_program_test::*;
 use solana_sdk::{
-    signature::Keypair, signer::Signer, transaction::TransactionError, transport::TransportError,
+    signature::Keypair, signer::Signer,
 };
 use utils::*;
 
@@ -87,7 +86,7 @@ async fn setup(
 
 #[tokio::test]
 async fn success() {
-    let (mut context, _test_metadata, _test_master_edition_v2, test_pass_book, user) =
+    let (mut context, test_metadata, test_master_edition_v2, test_pass_book, user) =
         setup(true).await;
 
     test_pass_book
@@ -95,11 +94,33 @@ async fn success() {
             &mut context,
             &user,
             &user.pubkey(),
-            &user.token_account.pubkey(),
             &test_pass_book.token_account.pubkey(),
+            &test_metadata.mint.pubkey(),
+            Some(&user.token_account.pubkey()),
         )
         .await
         .unwrap();
 
     assert!(is_empty_account(&mut context, &test_pass_book.pubkey).await);
+}
+
+#[tokio::test]
+async fn success_delete_and_close() {
+    let (mut context, test_metadata, _test_master_edition_v2, test_pass_book, user) =
+        setup(true).await;
+
+    test_pass_book
+        .delete(
+            &mut context,
+            &user,
+            &user.pubkey(),
+            &test_pass_book.token_account.pubkey(),
+            &test_metadata.mint.pubkey(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert!(is_empty_account(&mut context, &test_pass_book.token_account.pubkey()).await);
+    assert!(is_empty_account(&mut context, &test_pass_book.pubkey).await)
 }

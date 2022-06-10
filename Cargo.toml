@@ -11,17 +11,17 @@ test-bpf = []
 num-derive = "~0.3"
 num-traits = "~0.2"
 num_enum = "~0.5.4"
-solana-program = "~1.9.5"
+solana-program = "~1.10.24"
 thiserror = "~1.0"
 borsh = "~0.9.1"
 spl-math = { version = "~0.1", features = [ "no-entrypoint" ] }
-spl-token = { version="~3.2.0", features = [ "no-entrypoint" ] }
+spl-token = { version="~3.3.0", features = [ "no-entrypoint" ] }
 mpl-token-metadata = { version="1.2.5", features = [ "no-entrypoint" ] }
 spl-associated-token-account = { version="1.0.3", features = [ "no-entrypoint" ] }
 
 [dev-dependencies]
-solana-program-test = "~1.9.5"
-solana-sdk = "~1.9.5"
+solana-program-test = "~1.10.24"
+solana-sdk = "~1.10.24"
 rand = { version="~0.8.4" }
 
 

@@ -337,7 +337,7 @@ pub fn create_payout_account<'a>(
                     &[payout_bump_seed],
                 ];
 
-                let unpack = Payout::unpack(&current_creator_payout_info.data.borrow_mut());
+                let unpack = Payout::unpack(&current_creator_payout_info.data.borrow());
                 let result: Result<(), ProgramError> = match unpack {
                     Ok(_) => Ok(()),
                     Err(_) => {
@@ -356,9 +356,7 @@ pub fn create_payout_account<'a>(
                                 rent_sysvar_info,
                             )?;
                         }
-                        let mut data = current_creator_payout_info.data.borrow_mut();
-                        if data.len() == 0 {
-                            // create payout account
+                        if (*current_creator_payout_info.data.borrow()).len() == 0 {
                             create_or_allocate_account_raw(
                                 *program_id,
                                 current_creator_payout_info,
@@ -369,15 +367,14 @@ pub fn create_payout_account<'a>(
                                 payout_signer_seeds,
                             )?;
                         }
-
-                        let mut payout = Payout::unpack_unchecked(&data)?;
+                        let mut payout = Payout::unpack_unchecked(&current_creator_payout_info.data.borrow_mut())?;
 
                         payout.init(
                             *current_creator_payout_info.key,
                             *price_mint_info.key,
                             *treasury_holder_info.key,
                         );
-                        Payout::pack(payout, *data)?;
+                        Payout::pack(payout, *current_creator_payout_info.data.borrow_mut())?;
                         Ok(())
                     }
                 };

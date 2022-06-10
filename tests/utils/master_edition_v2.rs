@@ -13,7 +13,7 @@ use solana_program::{
 };
 use solana_program_test::*;
 use solana_sdk::signature::Keypair;
-use solana_sdk::{pubkey::Pubkey, signature::Signer, transaction::Transaction, transport};
+use solana_sdk::{pubkey::Pubkey, signature::Signer, transaction::Transaction};
 
 #[derive(Debug)]
 pub struct TestMasterEditionV2 {
@@ -62,7 +62,7 @@ impl TestMasterEditionV2 {
         &self,
         context: &mut ProgramTestContext,
         max_supply: Option<u64>,
-    ) -> transport::Result<()> {
+    ) -> Result<(), BanksClientError> {
         let fake_token_program = Keypair::new();
 
         let fake_instruction = Instruction {
@@ -97,7 +97,7 @@ impl TestMasterEditionV2 {
         &self,
         context: &mut ProgramTestContext,
         max_supply: Option<u64>,
-    ) -> transport::Result<()> {
+    ) -> Result<(), BanksClientError> {
         let tx = Transaction::new_signed_with_payer(
             &[instruction::create_master_edition(
                 id(),

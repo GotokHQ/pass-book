@@ -70,10 +70,10 @@ pub enum NFTPassInstruction {
     ///   0.  `[writable]` Pass book account with address as pda of (PDA ['pass', program id, master metadata mint id] )
     ///   1.  `[signer]` Authority of pass book account
     ///   2.  `[writable]` Refunder
-    ///   3.  `[writable]` New master edition owner
-    ///   4.  `[writable]` Token account owned by pass book that holds the master edition
-    ///   5.  `[]` Rent
-    ///   6.  `[]` SPL Token Program
+    ///   3.  `[writable]` Token account owned by pass book that holds the master edition
+    ///   4.  `[]` Mint account of the token   
+    ///   5.  `[]` SPL Token Program
+    ///   6.  `[writable]` New master edition owner
     DeletePassBook,
     /// DeactivatePassBook
     ///
@@ -158,20 +158,46 @@ pub fn delete_pass_book(
     pass_book: &Pubkey,
     authority: &Pubkey,
     refunder: &Pubkey,
-    new_master_edition_owner: &Pubkey,
     token_account: &Pubkey,
+    mint_account: &Pubkey,
+    new_master_edition_owner: Option<&Pubkey>,
 ) -> Instruction {
-    let accounts = vec![
+    let mut accounts = vec![
         AccountMeta::new(*pass_book, false),
         AccountMeta::new_readonly(*authority, true),
         AccountMeta::new(*refunder, false),
-        AccountMeta::new(*new_master_edition_owner, false),
         AccountMeta::new(*token_account, false),
-        AccountMeta::new_readonly(sysvar::rent::id(), false),
+        AccountMeta::new(*mint_account, false),
         AccountMeta::new_readonly(spl_token::id(), false),
     ];
-
+    if let Some(new_master_edition) = new_master_edition_owner {
+        accounts.push(AccountMeta::new(*new_master_edition, false))
+    }
     Instruction::new_with_borsh(*program_id, &NFTPassInstruction::DeletePassBook, accounts)
+}
+
+/// Create `EditPassBook` instruction
+pub fn edit_pass_book(
+    program_id: &Pubkey,
+    pass_book: &Pubkey,
+    authority: &Pubkey,
+    price_mint: Option<&Pubkey>,
+    args: EditPassBookArgs,
+) -> Instruction {
+    let mut accounts = vec![
+        AccountMeta::new(*pass_book, false),
+        AccountMeta::new_readonly(*authority, true),
+    ];
+
+    if let Some(new_price_mint) = price_mint {
+        accounts.push(AccountMeta::new_readonly(*new_price_mint, false))
+    }
+
+    Instruction::new_with_borsh(
+        *program_id,
+        &NFTPassInstruction::EditPassBook(args),
+        accounts,
+    )
 }
 
 /// Create `InitPassBook` instruction
@@ -221,30 +247,6 @@ pub fn init_pass_book(
     Instruction::new_with_borsh(
         *program_id,
         &NFTPassInstruction::InitPassBook(args),
-        accounts,
-    )
-}
-
-/// Create `EditPassBook` instruction
-pub fn edit_pass_book(
-    program_id: &Pubkey,
-    pass_book: &Pubkey,
-    authority: &Pubkey,
-    price_mint: Option<&Pubkey>,
-    args: EditPassBookArgs,
-) -> Instruction {
-    let mut accounts = vec![
-        AccountMeta::new(*pass_book, false),
-        AccountMeta::new_readonly(*authority, true),
-    ];
-
-    if let Some(new_price_mint) = price_mint {
-        accounts.push(AccountMeta::new_readonly(*new_price_mint, false))
-    }
-
-    Instruction::new_with_borsh(
-        *program_id,
-        &NFTPassInstruction::EditPassBook(args),
         accounts,
     )
 }

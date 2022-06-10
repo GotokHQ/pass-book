@@ -221,7 +221,7 @@ impl Pack for PassBook {
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
         if (src[0] != AccountType::PassBook as u8
             && src[0] != AccountType::Uninitialized as u8)
-            || src.len() != Self::LEN
+           || src.len() != Self::LEN
         {
             msg!("Failed to deserialize");
             return Err(ProgramError::InvalidAccountData);

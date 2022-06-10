@@ -119,7 +119,7 @@ async fn failure() {
 
     let result = test_pass_book.deactivate(&mut context, &user).await;
     assert_custom_error!(
-        result.unwrap_err(),
+        result.unwrap_err().unwrap(),
         NFTPassError::PassBookIsAlreadyDeactivated,
         0
     );
@@ -132,5 +132,5 @@ async fn failure_invalid_state() {
 
     let result = test_pass_book.deactivate(&mut context, &user).await;
 
-    assert_custom_error!(result.unwrap_err(), NFTPassError::PassNotActivated, 0);
+    assert_custom_error!(result.unwrap_err().unwrap(), NFTPassError::PassNotActivated, 0);
 }
