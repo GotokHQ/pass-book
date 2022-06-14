@@ -4,6 +4,7 @@ use nft_pass_book::{
     find_pass_book_program_address, find_payout_program_address,
     instruction::{self, EditPassBookArgs},
     state::PassBook,
+    utils::cmp_pubkeys
 };
 use solana_program::{
     program_pack::Pack, pubkey::Pubkey, system_instruction, system_program::ID as system_id,
@@ -159,7 +160,7 @@ impl TestPassBook {
             vec![]
         };
 
-        let is_native = *price_mint == system_id;
+        let is_native =  cmp_pubkeys(price_mint, &spl_token::native_mint::id());
         let (token_accounts, token_accounts_pub_key) = if is_native {
             (vec![], payout.clone())
         } else {

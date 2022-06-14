@@ -1,7 +1,6 @@
 mod utils;
 
 use nft_pass_book::{find_pass_store_program_address, instruction};
-use solana_program::{system_program::ID as system_id};
 use solana_program_test::*;
 use solana_sdk::{
     signature::Keypair, signer::Signer,
@@ -59,7 +58,7 @@ async fn setup(
             &test_metadata,
             &user,
             &store,
-            &system_id,
+            &spl_token::native_mint::id(),
             instruction::InitPassBookArgs {
                 name: name.clone(),
                 uri: uri.clone(),
@@ -86,7 +85,7 @@ async fn setup(
 
 #[tokio::test]
 async fn success() {
-    let (mut context, test_metadata, test_master_edition_v2, test_pass_book, user) =
+    let (mut context, test_metadata, _test_master_edition_v2, test_pass_book, user) =
         setup(true).await;
 
     test_pass_book

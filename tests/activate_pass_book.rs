@@ -1,12 +1,11 @@
 mod utils;
 use num_traits::FromPrimitive;
 use nft_pass_book::{find_pass_store_program_address, instruction, state::PassBookState, error::NFTPassError};
-use solana_program::{instruction::InstructionError, system_program::ID as system_id};
+use solana_program::{instruction::InstructionError};
 use solana_program_test::*;
 use solana_sdk::{
     signature::Keypair, signer::Signer,
-    transaction::{TransactionError},
-    transport::TransportError,
+    transaction::{TransactionError}
 };
 use utils::*;
 
@@ -61,7 +60,7 @@ async fn setup(
             &test_metadata,
             &user,
             &store,
-            &system_id,
+            &spl_token::native_mint::id(),
             instruction::InitPassBookArgs {
                 name: name.clone(),
                 uri: uri.clone(),

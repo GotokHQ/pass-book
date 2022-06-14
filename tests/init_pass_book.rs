@@ -7,7 +7,6 @@ use nft_pass_book::{
 };
 use num_traits::FromPrimitive;
 use solana_program::{
-    system_program::ID as system_id,
     instruction::InstructionError
 };
 use solana_program_test::*;
@@ -68,7 +67,7 @@ async fn success() {
             &test_metadata,
             &user,
             &store,
-            &system_id,
+            &spl_token::native_mint::id(),
             instruction::InitPassBookArgs {
                 name: name.clone(),
                 uri: uri.clone(),
@@ -120,7 +119,7 @@ async fn failure() {
             &test_metadata,
             &admin,
             &store,
-            &system_id,
+            &spl_token::native_mint::id(),
             instruction::InitPassBookArgs {
                 name: name.clone(),
                 uri: uri.clone(),

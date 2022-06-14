@@ -1,26 +1,25 @@
 //! Program utils
 
-
 use crate::{
     error::NFTPassError,
-    find_program_authority,
-    find_pass_collection_mint,
-    state::{PREFIX, PassStore},
+    find_pass_collection_mint, find_program_authority,
+    state::{PassStore, PREFIX},
 };
- 
+
 use solana_program::{
     account_info::AccountInfo,
     entrypoint::ProgramResult,
     msg,
     program::{invoke, invoke_signed},
     program_error::ProgramError,
+    program_memory::sol_memcmp,
     program_pack::{IsInitialized, Pack},
-    pubkey::Pubkey,
+    pubkey::{Pubkey, PUBKEY_BYTES},
     system_instruction,
     sysvar::{rent::Rent, Sysvar},
 };
 
-use spl_associated_token_account::{create_associated_token_account};
+use spl_associated_token_account::create_associated_token_account;
 
 /// Assert uninitialized
 pub fn assert_uninitialized<T: IsInitialized>(account: &T) -> ProgramResult {
@@ -50,11 +49,15 @@ pub fn assert_owned_by(account: &AccountInfo, owner: &Pubkey) -> ProgramResult {
 }
 
 /// Assert account key
-pub fn assert_account_key(account_info: &AccountInfo, key: &Pubkey, error: Option<NFTPassError>) -> ProgramResult {
+pub fn assert_account_key(
+    account_info: &AccountInfo,
+    key: &Pubkey,
+    error: Option<NFTPassError>,
+) -> ProgramResult {
     if *account_info.key != *key {
         match error {
             Some(e) => Err(e.into()),
-            _ => Err(ProgramError::InvalidArgument)
+            _ => Err(ProgramError::InvalidArgument),
         }
     } else {
         Ok(())
@@ -216,7 +219,6 @@ pub fn create_or_allocate_account_raw<'a>(
     Ok(())
 }
 
-
 pub fn create_pass_collection<'a>(
     program_id: Pubkey,
     pass_authority_info: &AccountInfo<'a>,
@@ -236,14 +238,20 @@ pub fn create_pass_collection<'a>(
     let proving_process = match unpack {
         Ok(data) => Ok(data),
         Err(_) => {
-            let (pass_authority_key, pass_authority_bump_seed) = find_program_authority(&program_id);
+            let (pass_authority_key, pass_authority_bump_seed) =
+                find_program_authority(&program_id);
             let pass_authority_signer_seeds = &[
                 PREFIX.as_bytes(),
                 program_id.as_ref(),
                 &[pass_authority_bump_seed],
             ];
-            assert_account_key(pass_authority_info, &pass_authority_key, Some(NFTPassError::InvalidAuthorityKey))?;
-            let (pass_collection_key, pass_collection_bump_seed) = find_pass_collection_mint(&program_id);
+            assert_account_key(
+                pass_authority_info,
+                &pass_authority_key,
+                Some(NFTPassError::InvalidAuthorityKey),
+            )?;
+            let (pass_collection_key, pass_collection_bump_seed) =
+                find_pass_collection_mint(&program_id);
             let pass_collection_signer_seeds = &[
                 PREFIX.as_bytes(),
                 program_id.as_ref(),
@@ -253,7 +261,7 @@ pub fn create_pass_collection<'a>(
             if collection_mint_info.key != &pass_collection_key {
                 return Err(NFTPassError::InvalidPassKey.into());
             }
-        
+
             // create pass collection account
             create_or_allocate_account_raw(
                 program_id,
@@ -264,7 +272,7 @@ pub fn create_pass_collection<'a>(
                 PassStore::LEN,
                 pass_authority_signer_seeds,
             )?;
-        
+
             // create and mint account
             create_or_allocate_account_raw(
                 spl_token::id(),
@@ -275,14 +283,14 @@ pub fn create_pass_collection<'a>(
                 spl_token::state::Mint::LEN,
                 pass_collection_signer_seeds,
             )?;
-        
+
             spl_initialize_mint(
                 collection_mint_info,
                 pass_authority_info,
                 rent_sysvar_info,
                 0,
             )?;
-        
+
             // create associated token account from pass account and pass collection mint to hold collection token
             create_associated_token_account_raw(
                 payer_info,
@@ -293,7 +301,7 @@ pub fn create_pass_collection<'a>(
                 rent_sysvar_info,
                 system_program_info,
             )?;
-        
+
             // initialize token account to hold mint tokens
             spl_initialize_account(
                 collection_token_info,
@@ -301,7 +309,7 @@ pub fn create_pass_collection<'a>(
                 pass_authority_info,
                 rent_sysvar_info,
             )?;
-        
+
             // mint token
             spl_mint(
                 collection_mint_info,
@@ -310,7 +318,7 @@ pub fn create_pass_collection<'a>(
                 1,
                 pass_authority_signer_seeds,
             )?;
-        
+
             create_metadata(
                 String::from(""),
                 String::from(""),
@@ -327,7 +335,7 @@ pub fn create_pass_collection<'a>(
                 system_program_info,
                 pass_authority_signer_seeds,
             )?;
-        
+
             create_master_edition(
                 collection_edition_info,
                 collection_mint_info,
@@ -353,7 +361,6 @@ pub fn create_pass_collection<'a>(
 
     proving_process
 }
-
 
 pub fn create_metadata<'a>(
     name: String,
@@ -474,4 +481,10 @@ pub fn empty_account_balance(
     **to += **from;
     **from = 0;
     Ok(())
+}
+
+/// Checks two pubkeys for equality in a computationally cheap way using
+/// `sol_memcmp`
+pub fn cmp_pubkeys(a: &Pubkey, b: &Pubkey) -> bool {
+    sol_memcmp(a.as_ref(), b.as_ref(), PUBKEY_BYTES) == 0
 }

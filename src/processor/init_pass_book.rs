@@ -20,7 +20,6 @@ use solana_program::{
     program_error::ProgramError,
     program_pack::{IsInitialized, Pack},
     pubkey::Pubkey,
-    system_program::ID as system_id,
     sysvar::{clock::Clock, Sysvar},
 };
 
@@ -65,7 +64,7 @@ pub fn init_pass_book(
     assert_owned_by(master_edition_info, &mpl_token_metadata::id())?;
     assert_owned_by(master_metadata_info, &mpl_token_metadata::id())?;
 
-    let is_native = *price_mint_info.key == system_id;
+    let is_native = cmp_pubkeys(price_mint_info.key, &spl_token::native_mint::id());
 
     if !is_native {
         assert_owned_by(price_mint_info, &spl_token::id())?;
@@ -341,7 +340,7 @@ pub fn create_payout_account<'a>(
                 let result: Result<(), ProgramError> = match unpack {
                     Ok(_) => Ok(()),
                     Err(_) => {
-                        let is_native = *price_mint_info.key == system_id;
+                        let is_native = cmp_pubkeys(price_mint_info.key, &spl_token::native_mint::id());
 
                         if is_native {
                             if treasury_holder_info.key != current_creator_payout_info.key {

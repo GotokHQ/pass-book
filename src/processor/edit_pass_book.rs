@@ -100,7 +100,7 @@ fn apply_changes(pass_book: &mut PassBook, changes: EditPassBookArgs, price_mint
         if *new_price_mint_account.key == pass_book.price_mint {
             return Err(NFTPassError::CantSetTheSameValue.into());
         }
-        let is_native = *new_price_mint_account.key == solana_program::system_program::ID;
+        let is_native = cmp_pubkeys(new_price_mint_account.key, &spl_token::native_mint::id());
 
         if !is_native {
             assert_owned_by(new_price_mint_account, &spl_token::id())?;
