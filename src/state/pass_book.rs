@@ -7,6 +7,7 @@ use crate::{
     math::SafeMath
 };
 use borsh::{BorshDeserialize, BorshSerialize};
+use mpl_token_metadata::state::{MAX_CREATOR_LIMIT};
 use solana_program::{
     borsh::try_from_slice_unchecked,
     msg,
@@ -35,6 +36,9 @@ pub const MAX_PASS_BOOK_LEN: usize = 1 //account type
 + 32 // price_mint
 + 32 // token
 + 33 // gatekeeper
++ 1
++ 4
++ MAX_CREATOR_LIMIT * 32
 + 128; // Padding
 
 
@@ -88,11 +92,13 @@ pub struct InitPassBook {
     pub token: Pubkey,
     /// gate keeper mint
     pub gate_keeper: Option<Pubkey>, 
+    /// cached creators
+    pub creators: Option<Vec<Pubkey>>,
 }
 
 /// Pack set
 #[repr(C)]
-#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize, BorshSchema)]
+#[derive(Debug, Clone, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct PassBook {
     /// Account type - PassBook
     pub account_type: AccountType,
@@ -130,6 +136,8 @@ pub struct PassBook {
     pub token: Pubkey,
     /// gate_keeper that must sign the transaction to buy or mint
     pub gate_keeper: Option<Pubkey>,
+    /// cached creators
+    pub creators: Option<Vec<Pubkey>>,
     
 }
 
@@ -153,6 +161,7 @@ impl PassBook {
         self.price_mint = params.price_mint;
         self.token = params.token;
         self.gate_keeper = params.gate_keeper;
+        self.creators = params.creators;
     }
 
     /// Increment total passes

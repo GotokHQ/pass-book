@@ -55,6 +55,7 @@ pub fn init_pass_book(
     let system_account_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
     let _ = next_account_info(account_info_iter)?; //token program
+    let _ = next_account_info(account_info_iter)?; //metadata program
 
     assert_signer(authority_info)?;
 
@@ -167,6 +168,7 @@ pub fn init_pass_book(
         &master_metadata.mint,
         Some(NFTPassError::InvalidMintKey),
     )?;
+
     // assert_account_key(
     //     pass_book_info,
     //     &master_metadata.update_authority,
@@ -239,6 +241,27 @@ pub fn init_pass_book(
         None
     };
 
+    let creators = if let Some(creators) = &master_metadata.data.creators {
+        let creator_keys: Vec<Pubkey> = creators
+            .iter()
+            .map(|creator| {
+                creator.address
+            })
+            .collect();
+        Some(creator_keys)
+    } else {
+        None
+    };
+
+    if let Some(creators) = &creators {
+        for creator in creators {
+            if creator == authority_info.key {
+                sign_metadata(authority_info, master_metadata_info, &[])?;
+                break;
+            }
+        }
+    }
+
     pass_book.init(InitPassBook {
         mint: *mint_info.key,
         name: args.name,
@@ -255,6 +278,7 @@ pub fn init_pass_book(
         price_mint: *price_mint_info.key,
         gate_keeper: gate_keeper,
         token: *token_account_info.key,
+        creators: creators
     });
 
     pass_book.puff_out_data_fields();

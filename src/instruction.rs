@@ -226,13 +226,14 @@ pub fn init_pass_book(
         AccountMeta::new_readonly(*authority, true),
         AccountMeta::new_readonly(*payer, true),
         AccountMeta::new_readonly(*mint, false),
-        AccountMeta::new_readonly(*master_metadata, false),
+        AccountMeta::new(*master_metadata, false),
         AccountMeta::new_readonly(*master_edition, false),
         AccountMeta::new_readonly(*price_mint, false),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),
         AccountMeta::new_readonly(spl_token::id(), false),
+        AccountMeta::new_readonly(mpl_token_metadata::id(), false),
     ];
 
     for (i, payout) in payout_accounts.iter().enumerate() {

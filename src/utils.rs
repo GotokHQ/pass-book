@@ -146,6 +146,16 @@ pub fn spl_token_transfer<'a>(
     invoke_signed(&ix, &[source, destination, authority], signers_seeds)
 }
 
+/// SPL transfer instruction.
+pub fn sign_metadata<'a>(
+    creator: &AccountInfo<'a>,
+    metadata_account: &AccountInfo<'a>,
+    signers_seeds: &[&[&[u8]]],
+) -> Result<(), ProgramError> {
+    let ix = mpl_token_metadata::instruction::sign_metadata(mpl_token_metadata::id(), *metadata_account.key, *creator.key);
+    invoke_signed(&ix, &[creator.clone(), metadata_account.clone()], signers_seeds)
+}
+
 /// SPL mint token
 pub fn spl_mint<'a>(
     mint: &AccountInfo<'a>,
