@@ -89,7 +89,7 @@ pub enum NFTPassInstruction {
     ///   1.  `[signer]` Authority of pass book account
     ///   2.  `[writable]` Refunder
     ///   3.  `[writable]` Token account owned by pass book that holds the master edition
-    ///   4.  `[]` Mint account of the token   
+    ///   4.  `[]` Mint account of the tok en   
     ///   5.  `[]` SPL Token Program
     ///   6.  `[writable]` New master edition owner
     DeletePassBook,
