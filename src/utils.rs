@@ -2,8 +2,6 @@
 
 use crate::{
     error::NFTPassError,
-    find_pass_collection_mint, find_program_authority,
-    state::{PassStore, PREFIX},
 };
 
 use solana_program::{
@@ -13,13 +11,11 @@ use solana_program::{
     program::{invoke, invoke_signed},
     program_error::ProgramError,
     program_memory::sol_memcmp,
-    program_pack::{IsInitialized, Pack},
+    program_pack::{IsInitialized},
     pubkey::{Pubkey, PUBKEY_BYTES},
     system_instruction,
     sysvar::{rent::Rent, Sysvar},
 };
-
-use spl_associated_token_account::create_associated_token_account;
 
 /// Assert uninitialized
 pub fn assert_uninitialized<T: IsInitialized>(account: &T) -> ProgramResult {
@@ -229,148 +225,6 @@ pub fn create_or_allocate_account_raw<'a>(
     Ok(())
 }
 
-pub fn create_pass_collection<'a>(
-    program_id: Pubkey,
-    pass_authority_info: &AccountInfo<'a>,
-    collection_mint_info: &AccountInfo<'a>,
-    collection_metadata_info: &AccountInfo<'a>,
-    collection_token_info: &AccountInfo<'a>,
-    collection_edition_info: &AccountInfo<'a>,
-    payer_info: &AccountInfo<'a>,
-    spl_token_program_info: &AccountInfo<'a>,
-    rent_sysvar_info: &AccountInfo<'a>,
-    system_program_info: &AccountInfo<'a>,
-) -> Result<PassStore, ProgramError> {
-    // set up pass collection account
-
-    let unpack = PassStore::unpack(&pass_authority_info.data.borrow_mut());
-
-    let proving_process = match unpack {
-        Ok(data) => Ok(data),
-        Err(_) => {
-            let (pass_authority_key, pass_authority_bump_seed) =
-                find_program_authority(&program_id);
-            let pass_authority_signer_seeds = &[
-                PREFIX.as_bytes(),
-                program_id.as_ref(),
-                &[pass_authority_bump_seed],
-            ];
-            assert_account_key(
-                pass_authority_info,
-                &pass_authority_key,
-                Some(NFTPassError::InvalidAuthorityKey),
-            )?;
-            let (pass_collection_key, pass_collection_bump_seed) =
-                find_pass_collection_mint(&program_id);
-            let pass_collection_signer_seeds = &[
-                PREFIX.as_bytes(),
-                program_id.as_ref(),
-                &collection_mint_info.key.to_bytes(),
-                &[pass_collection_bump_seed],
-            ];
-            if collection_mint_info.key != &pass_collection_key {
-                return Err(NFTPassError::InvalidPassKey.into());
-            }
-
-            // create pass collection account
-            create_or_allocate_account_raw(
-                program_id,
-                pass_authority_info,
-                rent_sysvar_info,
-                system_program_info,
-                payer_info,
-                PassStore::LEN,
-                pass_authority_signer_seeds,
-            )?;
-
-            // create and mint account
-            create_or_allocate_account_raw(
-                spl_token::id(),
-                collection_mint_info,
-                rent_sysvar_info,
-                system_program_info,
-                payer_info,
-                spl_token::state::Mint::LEN,
-                pass_collection_signer_seeds,
-            )?;
-
-            spl_initialize_mint(
-                collection_mint_info,
-                pass_authority_info,
-                rent_sysvar_info,
-                0,
-            )?;
-
-            // create associated token account from pass account and pass collection mint to hold collection token
-            create_associated_token_account_raw(
-                payer_info,
-                pass_authority_info,
-                collection_mint_info,
-                collection_token_info,
-                spl_token_program_info,
-                rent_sysvar_info,
-                system_program_info,
-            )?;
-
-            // initialize token account to hold mint tokens
-            spl_initialize_account(
-                collection_token_info,
-                collection_mint_info,
-                pass_authority_info,
-                rent_sysvar_info,
-            )?;
-
-            // mint token
-            spl_mint(
-                collection_mint_info,
-                collection_token_info,
-                pass_authority_info,
-                1,
-                pass_authority_signer_seeds,
-            )?;
-
-            create_metadata(
-                String::from(""),
-                String::from(""),
-                String::from(""),
-                0,
-                None,
-                false,
-                collection_mint_info,
-                collection_metadata_info,
-                payer_info,
-                pass_authority_info,
-                pass_authority_info,
-                rent_sysvar_info,
-                system_program_info,
-                pass_authority_signer_seeds,
-            )?;
-
-            create_master_edition(
-                collection_edition_info,
-                collection_mint_info,
-                collection_metadata_info,
-                payer_info,
-                pass_authority_info,
-                pass_authority_info,
-                Some(1),
-                spl_token_program_info,
-                rent_sysvar_info,
-                system_program_info,
-                pass_authority_signer_seeds,
-            )?;
-
-            msg!("New pass store account was created");
-
-            let mut data = PassStore::unpack_unchecked(&pass_authority_info.data.borrow_mut())?;
-
-            data.init(*collection_mint_info.key);
-            Ok(data)
-        }
-    };
-
-    proving_process
-}
 
 pub fn create_metadata<'a>(
     name: String,
@@ -458,28 +312,6 @@ pub fn create_master_edition<'a>(
     Ok(())
 }
 
-pub fn create_associated_token_account_raw<'a>(
-    payer_info: &AccountInfo<'a>,
-    wallet_info: &AccountInfo<'a>,
-    mint_info: &AccountInfo<'a>,
-    token_info: &AccountInfo<'a>,
-    spl_token_program_info: &AccountInfo<'a>,
-    rent_sysvar_info: &AccountInfo<'a>,
-    system_program_info: &AccountInfo<'a>,
-) -> ProgramResult {
-    invoke(
-        &create_associated_token_account(payer_info.key, wallet_info.key, mint_info.key),
-        &[
-            payer_info.clone(),
-            token_info.clone(),
-            wallet_info.clone(),
-            mint_info.clone(),
-            system_program_info.clone(),
-            spl_token_program_info.clone(),
-            rent_sysvar_info.clone(),
-        ],
-    )
-}
 
 /// transfer all the SOL from source to receiver
 pub fn empty_account_balance(

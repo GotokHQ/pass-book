@@ -16,7 +16,9 @@ pub const MAX_PASS_STORE_LEN: usize = 1+
 + 8 // total redeemed
 + 8 // total edition
 + 8 // total master edition
-+ 118; // Padding
++ 33 // store referrer
++ 9 // referral end
++ 64; //padding
 
 /// Pass Store
 #[repr(C)]
@@ -32,6 +34,10 @@ pub struct PassStore {
     pub pass_count: u64,
     /// count of master edition passes belonging to this store
     pub pass_book_count: u64,
+    /// referrer wallet
+    pub referrer: Option<Pubkey>,
+    /// Date referral rewards end
+    pub referral_end_date: Option<u64>,
 }
 
 impl PassStore {
@@ -74,7 +80,7 @@ impl IsInitialized for PassStore {
 impl Sealed for PassStore {}
 
 impl Pack for PassStore {
-    const LEN: usize = MAX_PASS_LEN;
+    const LEN: usize = MAX_PASS_STORE_LEN;
 
     fn pack_into_slice(&self, dst: &mut [u8]) {
         let mut slice = dst;

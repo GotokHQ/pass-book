@@ -35,11 +35,11 @@ pub const MAX_PASS_BOOK_LEN: usize = 1 //account type
 + 8 // price
 + 32 // price_mint
 + 32 // token
-+ 33 // gatekeeper
++ 33 // market authority
 + 1
 + 4
 + MAX_CREATOR_LIMIT * 32
-+ 128; // Padding
++ 85;
 
 
 /// Pass state
@@ -90,8 +90,8 @@ pub struct InitPassBook {
     pub price_mint: Pubkey,
     /// token
     pub token: Pubkey,
-    /// gate keeper mint
-    pub gate_keeper: Option<Pubkey>, 
+    /// market authority
+    pub market_authority: Option<Pubkey>, 
     /// cached creators
     pub creators: Option<Vec<Pubkey>>,
 }
@@ -134,8 +134,8 @@ pub struct PassBook {
     pub price_mint: Pubkey,
     /// token
     pub token: Pubkey,
-    /// gate_keeper that must sign the transaction to buy or mint
-    pub gate_keeper: Option<Pubkey>,
+    /// market_authority that must sign the transaction to buy or mint
+    pub market_authority: Option<Pubkey>,
     /// cached creators
     pub creators: Option<Vec<Pubkey>>,
     
@@ -160,7 +160,7 @@ impl PassBook {
         self.price = params.price;
         self.price_mint = params.price_mint;
         self.token = params.token;
-        self.gate_keeper = params.gate_keeper;
+        self.market_authority = params.market_authority;
         self.creators = params.creators;
     }
 

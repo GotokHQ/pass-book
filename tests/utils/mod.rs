@@ -4,10 +4,13 @@ mod pass_book;
 mod metadata;
 mod user;
 mod assert;
+mod token;
 
 pub use master_edition_v2::TestMasterEditionV2;
 pub use pass_book::TestPassBook;
 pub use metadata::TestMetadata;
+use solana_program::instruction::Instruction;
+pub use token::TestSplToken;
 pub use user::User;
 pub use assert::*;
 

@@ -20,10 +20,7 @@ pub const MAX_PAYOUT_LEN: usize = 1+
 + 32 // mint
 + 32 // treasury_holder
 + 4
-+ 16
-+ 118; // Padding
-
-
++ 16;
 
 /// Payout Account
 #[repr(C)]

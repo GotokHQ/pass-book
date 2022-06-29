@@ -7,7 +7,7 @@ use crate::{
     instruction::InitPassBookArgs,
     math::SafeMath,
     state::{
-        InitPassBook, PassBook, PassStore, Payout, MAX_DESCRIPTION_LEN, MAX_NAME_LENGTH,
+        InitPassBook, PassBook, PassStore, Payout, MAX_NAME_LENGTH,
         MAX_PASS_BOOK_LEN, MAX_URI_LENGTH, PREFIX,
     },
     utils::*,
@@ -54,8 +54,6 @@ pub fn init_pass_book(
     let rent_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
-    let _ = next_account_info(account_info_iter)?; //token program
-    let _ = next_account_info(account_info_iter)?; //metadata program
 
     assert_signer(authority_info)?;
 
@@ -136,10 +134,6 @@ pub fn init_pass_book(
         return Err(NFTPassError::UriTooLong.into());
     }
 
-    if args.description.len() > MAX_DESCRIPTION_LEN {
-        return Err(NFTPassError::DescriptionTooLong.into());
-    }
-
     if let Some(duration) = args.duration {
         if duration == 0 {
             return Err(NFTPassError::WrongDuration.into());
@@ -169,11 +163,6 @@ pub fn init_pass_book(
         Some(NFTPassError::InvalidMintKey),
     )?;
 
-    // assert_account_key(
-    //     pass_book_info,
-    //     &master_metadata.update_authority,
-    //     Some(NFTPassError::InvalidUpdateAuthorityKey),
-    // )?;
     assert_derivation(
         &token_metadata_program_id,
         master_edition_info,
@@ -222,7 +211,7 @@ pub fn init_pass_book(
         }
     }
 
-    create_payout_account(
+    get_or_create_payout_account_for_creators(
         program_id,
         &master_metadata,
         account_info_iter,
@@ -232,22 +221,40 @@ pub fn init_pass_book(
         price_mint_info,
     )?;
 
-    let gate_keeper_account = next_account_info(account_info_iter).ok();
-
-    let gate_keeper = if let Some(gate_keeper) = gate_keeper_account {
-        assert_signer(gate_keeper)?;
-        Some(*gate_keeper.key)
+    let market_authority = if args.has_market_authority {
+        let market_authority_account = next_account_info(account_info_iter)?;
+        assert_signer(market_authority_account)?;
+        get_or_create_payout_account(
+            program_id,
+            &market_authority_account.key,
+            account_info_iter,
+            payer_account_info,
+            rent_info,
+            system_account_info,
+            price_mint_info,
+        )?;
+        Some(*market_authority_account.key)
     } else {
         None
     };
 
+    if args.has_referrer {
+        let referrer_account = next_account_info(account_info_iter)?;
+        get_or_create_payout_account(
+            program_id,
+            &referrer_account.key,
+            account_info_iter,
+            payer_account_info,
+            rent_info,
+            system_account_info,
+            price_mint_info,
+        )?;
+        store.referrer = Some(*referrer_account.key);
+        store.referral_end_date = args.referral_end_date;
+    }
+
     let creators = if let Some(creators) = &master_metadata.data.creators {
-        let creator_keys: Vec<Pubkey> = creators
-            .iter()
-            .map(|creator| {
-                creator.address
-            })
-            .collect();
+        let creator_keys: Vec<Pubkey> = creators.iter().map(|creator| creator.address).collect();
         Some(creator_keys)
     } else {
         None
@@ -265,8 +272,8 @@ pub fn init_pass_book(
     pass_book.init(InitPassBook {
         mint: *mint_info.key,
         name: args.name,
-        description: args.description,
         uri: args.uri,
+        description: args.description,
         authority: *authority_info.key,
         mutable: args.mutable,
         duration: args.duration,
@@ -276,9 +283,9 @@ pub fn init_pass_book(
         created_at: clock.unix_timestamp as u64,
         price: args.price,
         price_mint: *price_mint_info.key,
-        gate_keeper: gate_keeper,
+        market_authority: market_authority,
         token: *token_account_info.key,
-        creators: creators
+        creators: creators,
     });
 
     pass_book.puff_out_data_fields();
@@ -328,7 +335,81 @@ pub fn get_pass_store_data<'a>(
     proving_process
 }
 
-pub fn create_payout_account<'a>(
+pub fn get_or_create_payout_account<'a>(
+    program_id: &Pubkey,
+    authority: &Pubkey,
+    remaining_accounts: &mut Iter<AccountInfo<'a>>,
+    payer_info: &AccountInfo<'a>,
+    rent_sysvar_info: &AccountInfo<'a>,
+    system_program_info: &AccountInfo<'a>,
+    price_mint_info: &AccountInfo<'a>,
+) -> Result<(), ProgramError> {
+    // set up pass store account
+    let payout_info = next_account_info(remaining_accounts)?;
+    let treasury_holder_info = next_account_info(remaining_accounts)?;
+    let (payout_key, payout_bump_seed) =
+        find_payout_program_address(program_id, authority, price_mint_info.key);
+    
+    msg!("AUTHORITY: {}", authority.to_string());
+    msg!("PAYOUT KEY: {}", payout_key.to_string());
+    msg!("PAYOUT INFO KEY: {}", payout_info.key.to_string());
+    msg!("MINT KEY: {}", price_mint_info.key.to_string());
+    assert_account_key(
+        payout_info,
+        &payout_key,
+        Some(NFTPassError::InvalidPayoutKey),
+    )?;
+    let payout_signer_seeds = &[
+        PREFIX.as_bytes(),
+        program_id.as_ref(),
+        &authority.to_bytes(),
+        &price_mint_info.key.to_bytes(),
+        Payout::PREFIX.as_bytes(),
+        &[payout_bump_seed],
+    ];
+    let unpack = Payout::unpack(&payout_info.data.borrow_mut());
+
+    match unpack {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            let is_native = cmp_pubkeys(price_mint_info.key, &spl_token::native_mint::id());
+            if is_native {
+                if treasury_holder_info.key != payout_info.key {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+            } else {
+                assert_owned_by(treasury_holder_info, &spl_token::id())?;
+                spl_initialize_account(
+                    treasury_holder_info,
+                    price_mint_info,
+                    payout_info,
+                    rent_sysvar_info,
+                )?;
+                msg!("Token initialized");
+            }
+            // create payout account
+            create_or_allocate_account_raw(
+                *program_id,
+                payout_info,
+                rent_sysvar_info,
+                system_program_info,
+                payer_info,
+                Payout::LEN,
+                payout_signer_seeds,
+            )?;
+
+            msg!("New payout account was created");
+
+            let mut data = Payout::unpack_unchecked(&payout_info.data.borrow_mut())?;
+
+            data.init(*authority, *price_mint_info.key, *treasury_holder_info.key);
+            Payout::pack( data, *payout_info.data.borrow_mut())?;
+            Ok(())
+        }
+    }
+}
+
+pub fn get_or_create_payout_account_for_creators<'a>(
     program_id: &Pubkey,
     metadata: &Metadata,
     remaining_accounts: &mut Iter<AccountInfo<'a>>,
@@ -341,67 +422,15 @@ pub fn create_payout_account<'a>(
     match &metadata.data.creators {
         Some(creators) => {
             for creator in creators {
-                let current_creator_payout_info = next_account_info(remaining_accounts)?;
-                let treasury_holder_info = next_account_info(remaining_accounts)?;
-                let (payout_key, payout_bump_seed) =
-                    find_payout_program_address(program_id, &creator.address, price_mint_info.key);
-                assert_account_key(
-                    current_creator_payout_info,
-                    &payout_key,
-                    Some(NFTPassError::InvalidPayoutKey),
+                get_or_create_payout_account(
+                    program_id,
+                    &creator.address,
+                    remaining_accounts,
+                    payer_info,
+                    rent_sysvar_info,
+                    system_program_info,
+                    price_mint_info,
                 )?;
-
-                let payout_signer_seeds = &[
-                    PREFIX.as_bytes(),
-                    program_id.as_ref(),
-                    &creator.address.to_bytes(),
-                    &price_mint_info.key.to_bytes(),
-                    Payout::PREFIX.as_bytes(),
-                    &[payout_bump_seed],
-                ];
-
-                let unpack = Payout::unpack(&current_creator_payout_info.data.borrow());
-                let result: Result<(), ProgramError> = match unpack {
-                    Ok(_) => Ok(()),
-                    Err(_) => {
-                        let is_native = cmp_pubkeys(price_mint_info.key, &spl_token::native_mint::id());
-
-                        if is_native {
-                            if treasury_holder_info.key != current_creator_payout_info.key {
-                                return Err(ProgramError::InvalidAccountData);
-                            }
-                        } else {
-                            assert_owned_by(treasury_holder_info, &spl_token::id())?;
-                            spl_initialize_account(
-                                treasury_holder_info,
-                                price_mint_info,
-                                current_creator_payout_info,
-                                rent_sysvar_info,
-                            )?;
-                        }
-                        if (*current_creator_payout_info.data.borrow()).len() == 0 {
-                            create_or_allocate_account_raw(
-                                *program_id,
-                                current_creator_payout_info,
-                                rent_sysvar_info,
-                                system_program_info,
-                                payer_info,
-                                Payout::LEN,
-                                payout_signer_seeds,
-                            )?;
-                        }
-                        let mut payout = Payout::unpack_unchecked(&current_creator_payout_info.data.borrow_mut())?;
-
-                        payout.init(
-                            *current_creator_payout_info.key,
-                            *price_mint_info.key,
-                            *treasury_holder_info.key,
-                        );
-                        Payout::pack(payout, *current_creator_payout_info.data.borrow_mut())?;
-                        Ok(())
-                    }
-                };
-                result.unwrap()
             }
             Ok(())
         }

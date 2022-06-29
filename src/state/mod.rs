@@ -26,7 +26,7 @@ pub const MAX_URI_LENGTH: usize = 200;
 
 pub const MAX_NAME_LENGTH: usize = 32;
 
-pub const MAX_LENGTH_IMAGE_HASH: usize = 200;
+pub const MAX_LENGTH_IMAGE_HASH: usize = 90;
 
 /// Max len of pass description string
 pub const MAX_DESCRIPTION_LEN: usize = 500;

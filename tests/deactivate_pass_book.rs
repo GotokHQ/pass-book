@@ -27,6 +27,14 @@ async fn setup(
         owner: Keypair::new(),
         token_account: Keypair::new(),
     };
+    let referrer = User {
+        owner: Keypair::new(),
+        token_account: Keypair::new(),
+    };
+    let market_authority = User {
+        owner: Keypair::new(),
+        token_account: Keypair::new(),
+    };
     test_metadata
         .create(
             &mut context,
@@ -62,6 +70,8 @@ async fn setup(
             &user,
             &store,
             &spl_token::native_mint::id(),
+            Some(&market_authority),
+            Some(&referrer),
             instruction::InitPassBookArgs {
                 name: name.clone(),
                 uri: uri.clone(),
@@ -72,6 +82,9 @@ async fn setup(
                 max_supply: Some(5),
                 blur_hash: None,
                 price: 0,
+                has_referrer: true,
+                has_market_authority: true,
+                referral_end_date: None
             },
         )
         .await

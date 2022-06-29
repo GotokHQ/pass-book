@@ -49,7 +49,8 @@ impl Processor {
             NFTPassInstruction::InitPassBook(args) => {
                 msg!("Instruction: InitPassBook");
                 init_pass_book(program_id, accounts, args)
-            }
+            },
+            _ => Ok(())
         }
     }
 }
