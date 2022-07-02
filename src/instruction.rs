@@ -8,6 +8,8 @@ use solana_program::{
     system_program, sysvar,
 };
 
+use crate::state::PayoutInfoArgs;
+
 /// Initialize a PackSet arguments
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone)]
@@ -37,6 +39,8 @@ pub struct InitPassBookArgs {
     pub has_market_authority: bool,
     /// The date after which referral rewards expires
     pub referral_end_date: Option<u64>,
+    /// The maximum number of passes a user can have in wallet
+    pub pieces_in_one_wallet: Option<u64>,
 }
 
 /// Edit a PassBook arguments
@@ -148,34 +152,35 @@ pub enum NFTPassInstruction {
     /// Buy a pass from a Pass Book.
     ///
     /// Accounts:
-    ///   0.  `[writable]` Pass book account with address as pda of (PDA ['pass', program id, master metadata mint id] )
-    ///   0.  `[writable]` The pass store account with address as pda of (PDA ['pass', program id, authority, 'store'] )
-    ///   2.  `[writable]` Pass book token account vaulted that holds the master edition
-    ///   1.  `[signer]`   The wallet of the user making the purchase
-    ///   2.  `[writable]` Token account owned by user wallet used for transfer
-    ///   1.  `[signer]`   The fee payer 
-    ///   1.  `[writable]` New metadata account   || Will be created by mpl_token_metadata
-    ///   1.  `[writable]` New edition account    || Will be created by mpl_token_metadata
-    ///   1.  `[writable]` New mint account 
-    ///   1.  `[writable]` Master edition account 
-    ///   1.  `[writable]` Master metadata account 
-    ///   1.  `[writable]` Edition marker account  || Will be created by `mpl_token_metadata
-    ///   2.  `[writable]` New token account that holds limited edition
-    ///   3.  `[writable]` Creator payout info account []
-    ///   3.  `[writable]` Creator payout token account []
-    ///   3.  `[writable]` Creator payout ticket account [] || Will be created by nft_  pass
-    ///   3.  `[signer]`   Market place authority
-    ///   3.  `[writable]` Market place payout info account
-    ///   3.  `[writable]` Market place payout token account
-    ///   3.  `[writable]` Market place payout ticker account || Will be created by nft_  pass
-    ///   3.  `[]`         Referral user wallet
-    ///   3.  `[writable]` Referral payout info account
-    ///   3.  `[writable]` Referral payout token account
-    ///   3.  `[writable]` Referral payout ticket account || Will be created by nft_  pass
-    ///   4.  `[]` Mint account of the token   
-    ///   5.  `[]` SPL Token Program
-    ///   6.  `[writable]` New master edition owner
-    BuyPass,
+    ///   0.   `[writable]` Pass book account with address as pda of (PDA ['pass', program id, master metadata mint id] )
+    ///   1.   `[writable]` The pass store account with address as pda of (PDA ['pass', program id, authority, 'store'] )
+    ///   2.   `[writable]` Pass book token account vaulted that holds the master edition
+    ///   3.   `[signer]`   The wallet of the user making the purchase
+    ///   4.   `[writable]` Token account owned by user wallet used for transfer
+    ///   5.   `[signer]`   The fee payer 
+    ///   6.   `[writable]` New metadata account   || Will be created by mpl_token_metadata
+    ///   7.   `[writable]` New edition account    || Will be created by mpl_token_metadata
+    ///   8.   `[writable]` New mint account 
+    ///   9.   `[writable]` Master edition account 
+    ///   10.  `[writable]` Master metadata account 
+    ///   11.  `[writable]` Edition marker account  || Will be created by `mpl_token_metadata
+    ///   12.  `[writable]` New token account that holds limited edition
+    ///   12.  `[writable]` Trade history 
+    ///   13.  `[writable]` Creator payout info account []
+    ///   14.  `[writable]` Creator payout token account []
+    ///   15.  `[writable]` Creator payout ticket account [] || Will be created by nft_  pass
+    ///   16.  `[signer]`   Market place authority
+    ///   17.  `[writable]` Market place payout info account
+    ///   18.  `[writable]` Market place payout token account
+    ///   19.  `[writable]` Market place payout ticker account || Will be created by nft_  pass
+    ///   20.  `[]`         Referral user wallet
+    ///   21.  `[writable]` Referral payout info account
+    ///   22.  `[writable]` Referral payout token account
+    ///   23.  `[writable]` Referral payout ticket account || Will be created by nft_  pass
+    ///   24.  `[]` Mint account of the token   
+    ///   25.  `[]` SPL Token Program
+    ///   26.  `[writable]` New master edition owner
+    BuyPass(BuyPassArgs),
 
 }
 
@@ -253,13 +258,6 @@ pub fn edit_pass_book(
         &NFTPassInstruction::EditPassBook(args),
         accounts,
     )
-}
-
-#[derive(Debug)]
-pub struct PayoutInfoArgs {
-    pub authority: Pubkey,
-    pub payout_account: Pubkey,
-    pub token_account: Pubkey,
 }
 
 

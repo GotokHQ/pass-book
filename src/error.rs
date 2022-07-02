@@ -119,6 +119,54 @@ pub enum NFTPassError {
     /// Pass book is already deactivated
     #[error("PassBookIsAlreadyDeactivated")]
     PassBookIsAlreadyDeactivated,
+
+    /// Price token does not match what was provided
+    #[error("PriceTokenMismatch")]
+    PriceTokenMismatch,
+
+    /// User wallet must match user token account
+    #[error("UserWalletMustMatchUserTokenAccount")]
+    UserWalletMustMatchUserTokenAccount,
+
+    /// Invalid Vault Key
+    #[error("InvalidVaultToken")]
+    InvalidVaultToken,
+
+    /// Invalid Market Authoriy Key
+    #[error("InvalidMarketAuthority")]
+    InvalidMarketAuthority,
+    
+    /// Market seller basis require market authority
+    #[error("MarketSellerBasisPointRequiresMarketAuthority")]
+    MarketSellerBasisPointRequiresMarketAuthority,
+
+    /// Wrong market seller basis point
+    #[error("WrongMarketSellerBasisPoint")]
+    WrongMarketSellerBasisPoint,
+
+    /// Math overflow
+    #[error("MathOverflow")]
+    MathOverflow,
+
+    /// Wrong Referral Share
+    #[error("WrongReferralShare")]
+    WrongReferralShare,
+    
+    /// Wrong Referral Kickback
+    #[error("WrongReferralKickBack")]
+    WrongReferralKickBack,
+
+    /// Invalid TradeHistory Key
+    #[error("InvalidTradeHistoryKey")]
+    InvalidTradeHistoryKey,
+
+    /// SupplyIsGtThanMaxSupply
+    #[error("SupplyIsGtThanMaxSupply")]
+    SupplyIsGtThanMaxSupply,
+
+    /// UserReachBuyLimit
+    #[error("UserReachBuyLimit")]
+    UserReachBuyLimit
 }
 
 impl From<NFTPassError> for ProgramError {

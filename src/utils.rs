@@ -1,8 +1,6 @@
 //! Program utils
 
-use crate::{
-    error::NFTPassError,
-};
+use crate::error::NFTPassError;
 
 use solana_program::{
     account_info::AccountInfo,
@@ -11,7 +9,7 @@ use solana_program::{
     program::{invoke, invoke_signed},
     program_error::ProgramError,
     program_memory::sol_memcmp,
-    program_pack::{IsInitialized},
+    program_pack::IsInitialized,
     pubkey::{Pubkey, PUBKEY_BYTES},
     system_instruction,
     sysvar::{rent::Rent, Sysvar},
@@ -142,14 +140,35 @@ pub fn spl_token_transfer<'a>(
     invoke_signed(&ix, &[source, destination, authority], signers_seeds)
 }
 
+/// Native instruction.
+pub fn native_transfer<'a>(
+    source: AccountInfo<'a>,
+    destination: AccountInfo<'a>,
+    amount: u64,
+) -> Result<(), ProgramError> {
+    invoke(
+        // for native SOL transfer user_wallet key == user_token_account key
+        &system_instruction::transfer(&source.key, &destination.key, amount),
+        &[source, destination],
+    )
+}
+
 /// SPL transfer instruction.
 pub fn sign_metadata<'a>(
     creator: &AccountInfo<'a>,
     metadata_account: &AccountInfo<'a>,
     signers_seeds: &[&[&[u8]]],
 ) -> Result<(), ProgramError> {
-    let ix = mpl_token_metadata::instruction::sign_metadata(mpl_token_metadata::id(), *metadata_account.key, *creator.key);
-    invoke_signed(&ix, &[creator.clone(), metadata_account.clone()], signers_seeds)
+    let ix = mpl_token_metadata::instruction::sign_metadata(
+        mpl_token_metadata::id(),
+        *metadata_account.key,
+        *creator.key,
+    );
+    invoke_signed(
+        &ix,
+        &[creator.clone(), metadata_account.clone()],
+        signers_seeds,
+    )
 }
 
 /// SPL mint token
@@ -224,7 +243,6 @@ pub fn create_or_allocate_account_raw<'a>(
 
     Ok(())
 }
-
 
 pub fn create_metadata<'a>(
     name: String,
@@ -312,7 +330,6 @@ pub fn create_master_edition<'a>(
     Ok(())
 }
 
-
 /// transfer all the SOL from source to receiver
 pub fn empty_account_balance(
     source: &AccountInfo,
@@ -329,4 +346,131 @@ pub fn empty_account_balance(
 /// `sol_memcmp`
 pub fn cmp_pubkeys(a: &Pubkey, b: &Pubkey) -> bool {
     sol_memcmp(a.as_ref(), b.as_ref(), PUBKEY_BYTES) == 0
+}
+
+/// Wrapper of `mint_new_edition_from_master_edition_via_token` instruction from `mpl_token_metadata` program
+#[inline(always)]
+pub fn mpl_mint_new_edition_from_master_edition_via_token<'a>(
+    new_metadata: &AccountInfo<'a>,
+    new_edition: &AccountInfo<'a>,
+    new_mint: &AccountInfo<'a>,
+    new_mint_authority: &AccountInfo<'a>,
+    user_wallet: &AccountInfo<'a>,
+    token_account_owner: &AccountInfo<'a>,
+    token_account: &AccountInfo<'a>,
+    master_metadata: &AccountInfo<'a>,
+    master_edition: &AccountInfo<'a>,
+    metadata_mint: &Pubkey,
+    edition_marker: &AccountInfo<'a>,
+    token_program: &AccountInfo<'a>,
+    system_program: &AccountInfo<'a>,
+    rent: &AccountInfo<'a>,
+    edition: u64,
+    signers_seeds: &[&[u8]],
+) -> Result<(), ProgramError> {
+    let tx = mpl_token_metadata::instruction::mint_new_edition_from_master_edition_via_token(
+        mpl_token_metadata::id(),
+        *new_metadata.key,
+        *new_edition.key,
+        *master_edition.key,
+        *new_mint.key,
+        *new_mint_authority.key,
+        *user_wallet.key,
+        *token_account_owner.key,
+        *token_account.key,
+        *user_wallet.key,
+        *master_metadata.key,
+        *metadata_mint,
+        edition,
+    );
+
+    invoke_signed(
+        &tx,
+        &[
+            new_metadata.clone(),
+            new_edition.clone(),
+            master_edition.clone(),
+            new_mint.clone(),
+            edition_marker.clone(),
+            new_mint_authority.clone(),
+            user_wallet.clone(),
+            token_account_owner.clone(),
+            token_account.clone(),
+            user_wallet.clone(),
+            master_metadata.clone(),
+            token_program.clone(),
+            system_program.clone(),
+            rent.clone(),
+        ],
+        &[&signers_seeds],
+    )
+}
+
+/// Wrapper of `update_primary_sale_happened_via_token` instruction from `mpl_token_metadata` program
+#[inline(always)]
+pub fn mpl_update_primary_sale_happened_via_token<'a>(
+    metadata: &AccountInfo<'a>,
+    owner: &AccountInfo<'a>,
+    token: &AccountInfo<'a>,
+    signers_seeds: &[&[u8]],
+) -> Result<(), ProgramError> {
+    let tx = mpl_token_metadata::instruction::update_primary_sale_happened_via_token(
+        mpl_token_metadata::id(),
+        *metadata.key,
+        *owner.key,
+        *token.key,
+    );
+
+    invoke_signed(
+        &tx,
+        &[metadata.clone(), owner.clone(), token.clone()],
+        &[&signers_seeds],
+    )
+}
+
+pub fn calculate_shares(total_amount: u64, shares: u64) -> Result<u64, ProgramError> {
+    Ok(total_amount
+        .checked_mul(shares)
+        .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?
+        .checked_div(100)
+        .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?)
+}
+
+pub fn calculate_user_shares_by_points(
+    total_amount: u64,
+    seller_fee_basis_points: u64,
+    shares: u64,
+) -> Result<u64, ProgramError> {
+    Ok((total_amount
+        .checked_mul(seller_fee_basis_points)
+        .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?
+        .checked_div(10000)
+        .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?)
+    .checked_mul(shares)
+    .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?
+    .checked_div(100)
+    .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?)
+}
+
+pub fn calculate_amount_for_points(total_amount: u64, seller_fee_basis_points: u64) -> Result<u64, ProgramError> {
+    Ok(total_amount
+        .checked_mul(seller_fee_basis_points)
+        .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?
+        .checked_div(10000)
+        .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?)
+}
+
+pub fn calculate_shares_less_points(
+    total_amount: u64,
+    seller_fee_basis_points: u64,
+) -> Result<u64, ProgramError> {
+    Ok(total_amount
+        .checked_sub(
+            total_amount
+                .checked_mul(seller_fee_basis_points)
+                .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?
+                .checked_div(10000)
+                .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?,
+        )
+        .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?)
 }

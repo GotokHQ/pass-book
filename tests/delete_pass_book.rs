@@ -81,7 +81,8 @@ async fn setup(
                 price: 0,
                 has_referrer: true,
                 has_market_authority: true,
-                referral_end_date: None
+                referral_end_date: None,
+                pieces_in_one_wallet: None,
             },
         )
         .await

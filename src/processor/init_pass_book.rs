@@ -286,6 +286,7 @@ pub fn init_pass_book(
         market_authority: market_authority,
         token: *token_account_info.key,
         creators: creators,
+        pieces_in_one_wallet: args.pieces_in_one_wallet
     });
 
     pass_book.puff_out_data_fields();

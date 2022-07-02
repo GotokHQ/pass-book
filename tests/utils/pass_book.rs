@@ -3,7 +3,7 @@ use mpl_token_metadata::state::Metadata;
 use nft_pass_book::{
     find_pass_book_program_address, find_payout_program_address,
     instruction::{self, EditPassBookArgs},
-    state::PassBook,
+    state::{PassBook, PayoutInfoArgs},
     utils::cmp_pubkeys
 };
 use solana_program::{
@@ -177,10 +177,11 @@ impl TestPassBook {
                         new_signers.push(account);
                         pub_key
                     };
-                    instruction::PayoutInfoArgs{
+                    PayoutInfoArgs{
                         authority: creator.address,
                         payout_account: creator_payout,
-                        token_account: token_account
+                        token_account: token_account,
+                        share: creator.share
                     }
                 })
                 .collect()
@@ -209,10 +210,11 @@ impl TestPassBook {
                 all_signers.push(&market_info.token_account);
                 market_info.token_account.pubkey()
             };
-            let market_auth = instruction::PayoutInfoArgs{
+            let market_auth = PayoutInfoArgs{
                 authority: market_info.pubkey(),
                 payout_account: payout,
-                token_account: token_account
+                token_account: token_account,
+                share: 100
             };
             Some(market_auth)
         } else {
@@ -237,10 +239,11 @@ impl TestPassBook {
                 all_signers.push(&referrer_user.token_account);
                 referrer_user.token_account.pubkey()
             };
-            let referrer = instruction::PayoutInfoArgs{
+            let referrer = PayoutInfoArgs{
                 authority: referrer_user.pubkey(),
                 payout_account: payout,
-                token_account: token_account
+                token_account: token_account,
+                share: 40
             };
             Some(referrer)
         } else {

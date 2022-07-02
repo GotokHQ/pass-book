@@ -16,7 +16,7 @@ pub mod entrypoint;
 // Export current sdk types for downstream users building with a different sdk version
 pub use solana_program;
 use solana_program::pubkey::Pubkey;
-use state::{PassStore, COLLECTION_MINT, PREFIX, Payout};
+use state::{PassStore, COLLECTION_MINT, PREFIX, Payout, TradeHistory};
 
 
 solana_program::declare_id!("passjvPvHQWN4SvBCmHk1gdrtBvoHRERtQK9MKemreQ");
@@ -64,6 +64,21 @@ pub fn find_payout_program_address(program_id: &Pubkey, authority: &Pubkey, mint
         program_id,
     )
 }
+
+/// Generates trade history account address
+pub fn find_trade_history_program_address(program_id: &Pubkey, passbook: &Pubkey, wallet: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            PREFIX.as_bytes(),
+            program_id.as_ref(),
+            &passbook.to_bytes(),
+            &wallet.to_bytes(),
+            TradeHistory::PREFIX.as_bytes(),
+        ],
+        program_id,
+    )
+}
+
 
 /// Generates master pass address
 pub fn find_pass_book_program_address(program_id: &Pubkey, mint: &Pubkey) -> (Pubkey, u8) {

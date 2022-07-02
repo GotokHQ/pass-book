@@ -6,11 +6,14 @@ mod pass;
 mod store;
 mod pass_book;
 mod payout;
+mod trade_history;
 
 pub use pass::*;
 pub use store::*;
 pub use pass_book::*;
 pub use payout::*;
+pub use trade_history::*;
+
 
 /// Global prefix for program addresses
 pub const PREFIX: &str = "passbook";
@@ -43,7 +46,11 @@ pub enum AccountType {
     /// Pass collection account
     PassBook,
     /// Payout
-    Payout
+    Payout,
+    /// TradeHistory
+    TradeHistory,
+    /// Payout
+    PayoutTicket
 }
 
 impl Default for AccountType {

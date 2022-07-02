@@ -94,6 +94,9 @@ pub struct InitPassBook {
     pub market_authority: Option<Pubkey>, 
     /// cached creators
     pub creators: Option<Vec<Pubkey>>,
+
+    /// The maximum number of passes a user can have in wallet
+    pub pieces_in_one_wallet: Option<u64>,
 }
 
 /// Pack set
@@ -138,7 +141,8 @@ pub struct PassBook {
     pub market_authority: Option<Pubkey>,
     /// cached creators
     pub creators: Option<Vec<Pubkey>>,
-    
+    /// The maximum number of passes a user can have in wallet
+    pub pieces_in_one_wallet: Option<u64>,
 }
 
 impl PassBook {
@@ -162,11 +166,20 @@ impl PassBook {
         self.token = params.token;
         self.market_authority = params.market_authority;
         self.creators = params.creators;
+        self.pieces_in_one_wallet = params.pieces_in_one_wallet;
     }
 
     /// Increment total passes
     pub fn increment_supply(&mut self) -> Result<(), ProgramError> {
         self.supply = self.supply.error_increment()?;
+        if let Some(max_supply) = self.max_supply {
+            if  self.supply > max_supply {
+                return Err(NFTPassError::SupplyIsGtThanMaxSupply.into());
+            } else if self.supply  == max_supply {
+                // selling_resource.state = SellingResourceState::Exhausted;
+                // market.state = MarketState::Ended;
+            }
+        }
         Ok(())
     }
 

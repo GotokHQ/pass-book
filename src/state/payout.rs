@@ -10,6 +10,32 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
+/// Enum representing the account type managed by the program
+#[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
+pub enum PayoutTicketType {
+    /// payout from purchase of pass
+    Direct,
+    /// payout from referral
+    Referral,
+    /// Pass from market
+    Market,
+}
+
+impl Default for PayoutTicketType {
+    fn default() -> Self {
+        PayoutTicketType::Direct
+    }
+}
+
+
+#[derive(Debug)]
+pub struct PayoutInfoArgs {
+    pub authority: Pubkey,
+    pub payout_account: Pubkey,
+    pub token_account: Pubkey,
+    pub share: u8,
+}
+
 // maximum number of balances to hold
 pub const MAX_NUM_BALANCES: usize = 10;
 

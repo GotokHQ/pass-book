@@ -100,7 +100,8 @@ async fn success() {
                 price: 0,
                 has_referrer: true,
                 has_market_authority: true,
-                referral_end_date: None
+                referral_end_date: None,
+                pieces_in_one_wallet: None,
             },
         )
         .await
@@ -165,7 +166,8 @@ async fn failure() {
                 price: 0,
                 has_referrer: true,
                 has_market_authority: true,
-                referral_end_date: None
+                referral_end_date: None,
+                pieces_in_one_wallet: None,
             },
         )
         .await;
@@ -225,7 +227,8 @@ async fn success_spl_token() {
                 price: 0,
                 has_referrer: referrer.is_some(), // Some(referrer.pubkey()),
                 has_market_authority: market_place_user.is_some(),
-                referral_end_date: None
+                referral_end_date: None,
+                pieces_in_one_wallet: None,
             },
         )
         .await

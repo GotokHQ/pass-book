@@ -6,6 +6,7 @@ use edit_pass_book::edit_pass_book;
 use delete_pass_book::delete_pass_book;
 use activate_pass_book::activate_pass_book;
 use deactivate_pass_book::deactivate_pass_book;
+use buy_pass_book::buy;
 
 use borsh::BorshDeserialize;
 use crate::instruction::NFTPassInstruction;
@@ -17,6 +18,7 @@ pub mod edit_pass_book;
 pub mod delete_pass_book;
 pub mod activate_pass_book;
 pub mod deactivate_pass_book;
+pub mod buy_pass_book;
 
 pub struct Processor {}
 
@@ -49,6 +51,10 @@ impl Processor {
             NFTPassInstruction::InitPassBook(args) => {
                 msg!("Instruction: InitPassBook");
                 init_pass_book(program_id, accounts, args)
+            },
+            NFTPassInstruction::BuyPass(args) => {
+                msg!("Instruction: BuyPass");
+                buy(program_id, accounts, args)
             },
             _ => Ok(())
         }
