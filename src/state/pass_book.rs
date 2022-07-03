@@ -94,7 +94,6 @@ pub struct InitPassBook {
     pub market_authority: Option<Pubkey>, 
     /// cached creators
     pub creators: Option<Vec<Pubkey>>,
-
     /// The maximum number of passes a user can have in wallet
     pub pieces_in_one_wallet: Option<u64>,
 }

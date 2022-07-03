@@ -2,11 +2,11 @@
 
 use crate::{
     error::NFTPassError,
-    find_pass_store_program_address, find_payout_program_address,
+    find_pass_store_program_address,
     find_trade_history_program_address, id,
     instruction::BuyPassArgs,
     state::{PassBook, PassStore, Payout, TradeHistory, PREFIX},
-    utils::*,
+    utils::*, find_pass_book_program_address,
 };
 
 use solana_program::{
@@ -19,18 +19,25 @@ use solana_program::{
     sysvar::{clock::Clock, Sysvar},
 };
 
-use mpl_token_metadata::{state::Metadata, utils::assert_initialized};
+use mpl_token_metadata::{
+    state::Metadata,
+    utils::{assert_initialized, get_supply_off_master_edition},
+};
 
 use std::slice::Iter;
 
 use spl_token::state::Account;
 
 /// Process InitPass instruction
-pub fn buy<'a>(program_id: &Pubkey, accounts: &'a [AccountInfo<'a>], args: BuyPassArgs) -> ProgramResult {
+pub fn buy<'a>(
+    program_id: &Pubkey,
+    accounts: &'a [AccountInfo<'a>],
+    args: BuyPassArgs,
+) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let pass_book_info = next_account_info(account_info_iter)?;
     let store_info = next_account_info(account_info_iter)?;
-    let source_token_account_info = next_account_info(account_info_iter)?;
+    let vault_token_account_info = next_account_info(account_info_iter)?;
     let user_wallet_info = next_account_info(account_info_iter)?;
     let user_token_account_info = next_account_info(account_info_iter)?;
     let payer_account_info = next_account_info(account_info_iter)?;
@@ -47,11 +54,12 @@ pub fn buy<'a>(program_id: &Pubkey, accounts: &'a [AccountInfo<'a>], args: BuyPa
     let clock_info = next_account_info(account_info_iter)?;
     let rent_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
+    let token_program_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
 
     assert_owned_by(pass_book_info, &id())?;
     assert_owned_by(store_info, &id())?;
-    assert_owned_by(source_token_account_info, &spl_token::id())?;
+    assert_owned_by(vault_token_account_info, &spl_token::id())?;
 
     assert_signer(user_wallet_info)?;
 
@@ -67,11 +75,11 @@ pub fn buy<'a>(program_id: &Pubkey, accounts: &'a [AccountInfo<'a>], args: BuyPa
 
     let mut pass_store = PassStore::unpack(&store_info.data.borrow_mut())?;
 
-    let (store_key, store_bump_seed) =
+    let (store_key, _) =
         find_pass_store_program_address(program_id, &passbook.authority);
     assert_account_key(store_info, &store_key, Some(NFTPassError::InvalidStoreKey))?;
     assert_account_key(
-        source_token_account_info,
+        vault_token_account_info,
         &passbook.token,
         Some(NFTPassError::InvalidVaultToken),
     )?;
@@ -98,18 +106,48 @@ pub fn buy<'a>(program_id: &Pubkey, accounts: &'a [AccountInfo<'a>], args: BuyPa
         }
     }
 
-    if args.market_fee_basis_point.is_some() && passbook.market_authority.is_none() {
-        return Err(NFTPassError::MarketSellerBasisPointRequiresMarketAuthority.into());
-    }
+    let edition = get_supply_off_master_edition(&master_edition_info)?
+        .checked_add(1)
+        .ok_or(NFTPassError::MathOverflow)?;
 
-    let market_fee_basis_point = if let Some(points) = args.market_fee_basis_point {
-        if points == 0 {
-            return Err(NFTPassError::WrongMarketSellerBasisPoint.into());
-        }
-        points
-    } else {
-        0
-    };
+    let (_, pass_book_bump_seed) =
+        find_pass_book_program_address(program_id, &passbook.mint);
+
+    let pass_book_signer_seeds = &[
+        PREFIX.as_bytes(),
+        program_id.as_ref(),
+        & passbook.mint.to_bytes(),
+        &[pass_book_bump_seed],
+    ];
+
+    mpl_mint_new_edition_from_master_edition_via_token(
+        &new_metadata_info,
+        &new_edition_info,
+        &new_mint_info,
+        &user_wallet_info,
+        &user_wallet_info,
+        &pass_book_info,
+        &vault_token_account_info,
+        &master_metadata_info,
+        &master_edition_info,
+        &master_metadata.mint,
+        &edition_marker_info,
+        &token_program_info,
+        &system_account_info,
+        &rent_info,
+        edition,
+        pass_book_signer_seeds
+    )?;
+    let new_token_account: Account = assert_initialized(new_token_account_info)?;
+    if new_token_account.owner != *user_wallet_info.key {
+        return Err(ProgramError::IllegalOwner);
+    }
+    mpl_update_primary_sale_happened_via_token(
+        &new_metadata_info,
+        &user_wallet_info,
+        &new_token_account_info,
+        &[],
+    )?;
 
     let (trade_history_key, trade_history_bump_seed) =
         find_trade_history_program_address(program_id, pass_book_info.key, user_wallet_info.key);
@@ -138,8 +176,8 @@ pub fn buy<'a>(program_id: &Pubkey, accounts: &'a [AccountInfo<'a>], args: BuyPa
         system_account_info,
         trade_history_signer_seeds,
     )?;
-    
-    // Check, that user not reach buy limit 
+
+    // Check, that user not reach buy limit
     // todo, add to passbook
     if let Some(pieces_in_one_wallet) = passbook.pieces_in_one_wallet {
         if trade_history.already_bought == pieces_in_one_wallet {
@@ -160,10 +198,9 @@ pub fn buy<'a>(program_id: &Pubkey, accounts: &'a [AccountInfo<'a>], args: BuyPa
     let master_metadata = Metadata::from_account_info(master_metadata_info)?;
 
     distribute_payout(
-        program_id,
-        market_fee_basis_point as u64,
-        0,
-        0,
+       args. market_fee_basis_point as u64,
+       args.referral_share as u64,
+        args.referral_kick_back_share as u64,
         &master_metadata,
         &passbook,
         &pass_store,
@@ -208,7 +245,6 @@ pub fn transfer<'a>(
 }
 
 pub fn pay_account<'a>(
-    program_id: &Pubkey,
     amount: u64,
     authority: &Pubkey,
     passbook: &PassBook,
@@ -217,15 +253,8 @@ pub fn pay_account<'a>(
     payout_account: &AccountInfo<'a>,
     payout_token_account: &AccountInfo<'a>,
 ) -> Result<(), ProgramError> {
-    let (payout_key, payout_bump_seed) =
-        find_payout_program_address(program_id, authority, &passbook.price_mint);
-    assert_account_key(
-        payout_account,
-        &payout_key,
-        Some(NFTPassError::InvalidPayoutKey),
-    )?;
     let mut payout = Payout::unpack(&payout_account.data.borrow_mut())?;
-    if *authority != payout.authority {
+    if *authority != payout.authority && passbook.price_mint != payout.mint {
         return Err(NFTPassError::InvalidPayoutKey.into());
     }
     let is_native = cmp_pubkeys(&passbook.price_mint, &spl_token::native_mint::id());
@@ -239,7 +268,7 @@ pub fn pay_account<'a>(
         if token_account.mint != passbook.price_mint {
             return Err(NFTPassError::PriceTokenMismatch.into());
         }
-        if token_account.owner != payout_key {
+        if token_account.owner != *payout_account.key {
             return Err(ProgramError::IllegalOwner);
         }
     }
@@ -250,11 +279,14 @@ pub fn pay_account<'a>(
         user_wallet,
         amount,
     )?;
+    payout.cash_in = payout.cash_in
+    .checked_add(passbook.price)
+    .ok_or(NFTPassError::MathOverflow)?;
+    Payout::pack(payout, *payout_account.data.borrow_mut())?;
     Ok(())
 }
 
 pub fn distribute_payout<'a>(
-    program_id: &Pubkey,
     market_fee_basis_point: u64,
     referral_share: u64,
     referral_kick_back: u64,
@@ -289,7 +321,6 @@ pub fn distribute_payout<'a>(
     }
 
     distribute_payout_for_creators(
-        program_id,
         amount_for_creators,
         passbook,
         metadata,
@@ -312,7 +343,6 @@ pub fn distribute_payout<'a>(
         let market_payout_token_info = next_account_info(remaining_accounts)?;
         let market_amount = calculate_shares(amount_for_market_place, 100 - referral_share)?;
         pay_account(
-            program_id,
             market_amount,
             &market_authority,
             passbook,
@@ -341,7 +371,6 @@ pub fn distribute_payout<'a>(
         let referrer_kick_back_amount = calculate_shares(amount_for_referrer, referral_kick_back)?;
         let referrer_amount = calculate_shares(amount_for_referrer, 100 - referral_kick_back)?;
         pay_account(
-            program_id,
             referrer_amount,
             &referrer,
             passbook,
@@ -351,9 +380,7 @@ pub fn distribute_payout<'a>(
             referrer_payout_token_info,
         )?;
         distribute_referral_payout_for_creators(
-            program_id,
             referrer_kick_back_amount,
-            metadata,
             passbook,
             &user_wallet,
             &user_token_account,
@@ -364,7 +391,6 @@ pub fn distribute_payout<'a>(
 }
 
 pub fn distribute_payout_for_creators<'a>(
-    program_id: &Pubkey,
     amount: u64,
     passbook: &PassBook,
     metadata: &Metadata,
@@ -372,6 +398,9 @@ pub fn distribute_payout_for_creators<'a>(
     user_token_account: &AccountInfo<'a>,
     payout_accounts: &[PayoutInfo<'a>],
 ) -> Result<(), ProgramError> {
+    if amount == 0 {
+        return Ok(())
+    }
     for creator in payout_accounts {
         let creator_amount = if metadata.primary_sale_happened {
             calculate_user_shares_by_points(
@@ -383,7 +412,6 @@ pub fn distribute_payout_for_creators<'a>(
             calculate_shares(amount, creator.share as u64)?
         };
         pay_account(
-            program_id,
             creator_amount,
             &creator.authority,
             passbook,
@@ -397,18 +425,18 @@ pub fn distribute_payout_for_creators<'a>(
 }
 
 pub fn distribute_referral_payout_for_creators<'a>(
-    program_id: &Pubkey,
     amount: u64,
-    metadata: &Metadata,
     passbook: &PassBook,
     user_wallet: &AccountInfo<'a>,
     user_token_account: &AccountInfo<'a>,
     payout_accounts: &[PayoutInfo<'a>],
 ) -> Result<(), ProgramError> {
+    if amount == 0 {
+        return Ok(())
+    }
     for creator in payout_accounts {
         let creator_amount = calculate_shares(amount, creator.share as u64)?;
         pay_account(
-            program_id,
             creator_amount,
             &creator.authority,
             passbook,
