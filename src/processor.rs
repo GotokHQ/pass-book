@@ -55,8 +55,7 @@ impl Processor {
             NFTPassInstruction::BuyPass(args) => {
                 msg!("Instruction: BuyPass");
                 buy(program_id, accounts, args)
-            },
-            _ => Ok(())
+            }
         }
     }
 }

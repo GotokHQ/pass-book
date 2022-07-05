@@ -28,6 +28,22 @@ impl TestSplToken {
         token_owner: &Pubkey,
     ) -> Result<(), BanksClientError> {
         create_mint(context, &self.mint, &context.payer.pubkey(), None).await?;
+        self.mint_to(
+            context,
+            amount,
+            token_account,
+            token_owner,
+        )
+        .await
+    }
+
+    pub async fn mint_to(
+        &self,
+        context: &mut ProgramTestContext,
+        amount: u64,
+        token_account: &Keypair,
+        token_owner: &Pubkey,
+    ) -> Result<(), BanksClientError> {
         create_token_account(context, token_account, &self.mint.pubkey(), token_owner).await?;
         mint_tokens(
             context,

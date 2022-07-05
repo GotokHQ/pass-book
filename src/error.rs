@@ -135,7 +135,7 @@ pub enum NFTPassError {
     /// Invalid Market Authoriy Key
     #[error("InvalidMarketAuthority")]
     InvalidMarketAuthority,
-    
+
     /// Market seller basis require market authority
     #[error("MarketSellerBasisPointRequiresMarketAuthority")]
     MarketSellerBasisPointRequiresMarketAuthority,
@@ -151,7 +151,7 @@ pub enum NFTPassError {
     /// Wrong Referral Share
     #[error("WrongReferralShare")]
     WrongReferralShare,
-    
+
     /// Wrong Referral Kickback
     #[error("WrongReferralKickBack")]
     WrongReferralKickBack,
@@ -166,7 +166,15 @@ pub enum NFTPassError {
 
     /// UserReachBuyLimit
     #[error("UserReachBuyLimit")]
-    UserReachBuyLimit
+    UserReachBuyLimit,
+
+    /// InvalidPayerTokenAccount
+    #[error("InvalidPayerTokenAccount")]
+    InvalidPayerTokenAccount,
+
+    /// InvalidTokenAccount
+    #[error("InvalidTokenAccount")]
+    InvalidTokenAccount,
 }
 
 impl From<NFTPassError> for ProgramError {

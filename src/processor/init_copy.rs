@@ -54,6 +54,7 @@ pub fn init_pass_book(
     let clock_info = next_account_info(account_info_iter)?;
     let rent_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
+    let spl_token_program_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
 
     assert_signer(authority_info)?;
@@ -104,6 +105,7 @@ pub fn init_pass_book(
         Some(NFTPassError::InvalidMintKey),
     )?;
 
+    msg!("START GENERATE NEW PASS BOOK PDA ----------------->");
     let (pass_book_key, pass_book_bump_seed) =
         find_pass_book_program_address(program_id, &master_metadata.mint);
 
@@ -116,6 +118,7 @@ pub fn init_pass_book(
     if pass_book_info.key != &pass_book_key {
         return Err(NFTPassError::InvalidPassBookKey.into());
     }
+    msg!("DONE GENERATE NEW PASS BOOK PDA ----------------->");
     // create and allocated pass pda account
     create_or_allocate_account_raw(
         id(),
@@ -126,6 +129,8 @@ pub fn init_pass_book(
         MAX_PASS_BOOK_LEN,
         pass_book_signer_seeds,
     )?;
+
+    msg!("DONE CREATING PASS BOOK ACCOUNT ----------------->");
 
     let mut pass_book = PassBook::unpack_unchecked(&pass_book_info.data.borrow_mut())?;
 
@@ -179,24 +184,39 @@ pub fn init_pass_book(
     if source.mint != master_metadata.mint {
         return Err(MetadataError::MintMismatch.into());
     }
-
+    msg!("START GET ASSOC ACCOUNT----------------->");
     let associated_token_account =
         get_associated_token_address(&pass_book_key, &master_metadata.mint);
 
+    msg!("DONE GET ASSOC ACCOUNT----------------->");
     // Check, that provided destination is associated token account
     if associated_token_account != *token_account_info.key {
         return Err(NFTPassError::InvalidTokenAccount.into());
     }
 
-    let _: Account = assert_initialized(token_account_info)?;
-    // Transfer from source to token account
-    spl_token_transfer(
-        source_info.clone(),
-        token_account_info.clone(),
-        authority_info.clone(),
-        1, // transfer master edition
-        &[],
-    )?;
+    // if token_account_info.lamports() == 0 && token_account_info.data_is_empty() {
+    //     msg!("START CREATE  ASSOC ACCOUNT----------------->");
+    //     create_associated_token_account_raw(
+    //         payer_account_info,
+    //         pass_book_info,
+    //         mint_info,
+    //         token_account_info,
+    //         spl_token_program_info,
+    //         rent_info,
+    //         system_account_info,
+    //         pass_book_signer_seeds,
+    //     )?;
+    //     msg!("DONE CREATE  ASSOC ACCOUNT----------------->");
+    // }
+
+    // // Transfer from source to token account
+    // spl_token_transfer(
+    //     source_info.clone(),
+    //     token_account_info.clone(),
+    //     payer_account_info.clone(),
+    //     1, // transfer master edition
+    //     &[],
+    // )?;
 
     match args.max_supply {
         Some(max_supply) => {
@@ -226,6 +246,7 @@ pub fn init_pass_book(
         rent_info,
         system_account_info,
         price_mint_info,
+        spl_token_program_info,
     )?;
 
     let market_authority = if args.has_market_authority {
@@ -239,6 +260,7 @@ pub fn init_pass_book(
             rent_info,
             system_account_info,
             price_mint_info,
+            spl_token_program_info,
         )?;
         Some(*market_authority_account.key)
     } else {
@@ -255,6 +277,7 @@ pub fn init_pass_book(
             rent_info,
             system_account_info,
             price_mint_info,
+            spl_token_program_info,
         )?;
         store.referrer = Some(*referrer_account.key);
         store.referral_end_date = args.referral_end_date;
@@ -290,7 +313,7 @@ pub fn init_pass_book(
         created_at: clock.unix_timestamp as u64,
         price: args.price,
         price_mint: *price_mint_info.key,
-        market_authority: market_authority,
+        market_authority: None,
         token: *token_account_info.key,
         creators: creators,
         pieces_in_one_wallet: args.pieces_in_one_wallet,
@@ -351,6 +374,7 @@ pub fn get_or_create_payout_account<'a>(
     rent_sysvar_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
     price_mint_info: &AccountInfo<'a>,
+    spl_token_program_info: &AccountInfo<'a>,
 ) -> Result<(), ProgramError> {
     // set up pass store account
     let payout_info = next_account_info(remaining_accounts)?;
@@ -358,8 +382,10 @@ pub fn get_or_create_payout_account<'a>(
     let (payout_key, payout_bump_seed) =
         find_payout_program_address(program_id, authority, price_mint_info.key);
 
-    msg!("PAYOUT INFO KEY -----------------> {}", payout_info.key);
-    msg!("PAYOUT DERIVED KEY -----------------> {}", payout_key);
+    msg!("AUTHORITY: {}", authority.to_string());
+    msg!("PAYOUT KEY: {}", payout_key.to_string());
+    msg!("PAYOUT INFO KEY: {}", payout_info.key.to_string());
+    msg!("MINT KEY: {}", price_mint_info.key.to_string());
     assert_account_key(
         payout_info,
         &payout_key,
@@ -391,8 +417,18 @@ pub fn get_or_create_payout_account<'a>(
                 if associated_token_account != *treasury_holder_info.key {
                     return Err(NFTPassError::InvalidPayerTokenAccount.into());
                 }
-
-                let _: Account = assert_initialized(treasury_holder_info)?;
+                // if treasury_holder_info.lamports() == 0 && treasury_holder_info.data_is_empty() {
+                //     create_associated_token_account_raw(
+                //         payer_info,
+                //         payout_info,
+                //         price_mint_info,
+                //         treasury_holder_info,
+                //         spl_token_program_info,
+                //         rent_sysvar_info,
+                //         system_program_info,
+                //         &[],
+                //     )?;
+                // }
                 msg!("Token initialized");
             }
             // create payout account
@@ -410,8 +446,8 @@ pub fn get_or_create_payout_account<'a>(
 
             let mut data = Payout::unpack_unchecked(&payout_info.data.borrow_mut())?;
 
-            data.init(*authority, *price_mint_info.key, *treasury_holder_info.key);
-            Payout::pack(data, *payout_info.data.borrow_mut())?;
+            // data.init(*authority, *price_mint_info.key, *treasury_holder_info.key);
+            // Payout::pack(data, *payout_info.data.borrow_mut())?;
             Ok(())
         }
     }
@@ -425,6 +461,7 @@ pub fn get_or_create_payout_account_for_creators<'a>(
     rent_sysvar_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
     price_mint_info: &AccountInfo<'a>,
+    spl_token_program_info: &AccountInfo<'a>,
 ) -> ProgramResult {
     // set up creator payout account
     match &metadata.data.creators {
@@ -438,6 +475,7 @@ pub fn get_or_create_payout_account_for_creators<'a>(
                     rent_sysvar_info,
                     system_program_info,
                     price_mint_info,
+                    spl_token_program_info,
                 )?;
             }
             Ok(())

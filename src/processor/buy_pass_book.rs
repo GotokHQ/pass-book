@@ -2,11 +2,11 @@
 
 use crate::{
     error::NFTPassError,
-    find_pass_store_program_address,
+    find_pass_book_program_address, find_pass_store_program_address,
     find_trade_history_program_address, id,
     instruction::BuyPassArgs,
     state::{PassBook, PassStore, Payout, TradeHistory, PREFIX},
-    utils::*, find_pass_book_program_address,
+    utils::*,
 };
 
 use solana_program::{
@@ -63,8 +63,6 @@ pub fn buy<'a>(
 
     assert_signer(user_wallet_info)?;
 
-    assert_owned_by(new_metadata_info, &mpl_token_metadata::id())?;
-    assert_owned_by(new_edition_info, &mpl_token_metadata::id())?;
     assert_owned_by(new_mint_info, &spl_token::id())?;
     assert_owned_by(master_metadata_info, &mpl_token_metadata::id())?;
     assert_owned_by(master_edition_info, &mpl_token_metadata::id())?;
@@ -75,8 +73,7 @@ pub fn buy<'a>(
 
     let mut pass_store = PassStore::unpack(&store_info.data.borrow_mut())?;
 
-    let (store_key, _) =
-        find_pass_store_program_address(program_id, &passbook.authority);
+    let (store_key, _) = find_pass_store_program_address(program_id, &passbook.authority);
     assert_account_key(store_info, &store_key, Some(NFTPassError::InvalidStoreKey))?;
     assert_account_key(
         vault_token_account_info,
@@ -102,6 +99,7 @@ pub fn buy<'a>(
             return Err(NFTPassError::PriceTokenMismatch.into());
         }
         if user_token_account.owner != *user_wallet_info.key {
+            msg!("USER TOKEN OWNER DOES NOT MATCH WALLET OWNER ----------------->");
             return Err(ProgramError::IllegalOwner);
         }
     }
@@ -110,13 +108,12 @@ pub fn buy<'a>(
         .checked_add(1)
         .ok_or(NFTPassError::MathOverflow)?;
 
-    let (_, pass_book_bump_seed) =
-        find_pass_book_program_address(program_id, &passbook.mint);
+    let (_, pass_book_bump_seed) = find_pass_book_program_address(program_id, &passbook.mint);
 
     let pass_book_signer_seeds = &[
         PREFIX.as_bytes(),
         program_id.as_ref(),
-        & passbook.mint.to_bytes(),
+        &passbook.mint.to_bytes(),
         &[pass_book_bump_seed],
     ];
 
@@ -124,8 +121,9 @@ pub fn buy<'a>(
         &new_metadata_info,
         &new_edition_info,
         &new_mint_info,
-        &user_wallet_info,
-        &user_wallet_info,
+        &payer_account_info,
+        &payer_account_info,
+        user_wallet_info,
         &pass_book_info,
         &vault_token_account_info,
         &master_metadata_info,
@@ -136,17 +134,17 @@ pub fn buy<'a>(
         &system_account_info,
         &rent_info,
         edition,
-        pass_book_signer_seeds
+        pass_book_signer_seeds,
     )?;
     let new_token_account: Account = assert_initialized(new_token_account_info)?;
     if new_token_account.owner != *user_wallet_info.key {
         return Err(ProgramError::IllegalOwner);
     }
+
     mpl_update_primary_sale_happened_via_token(
         &new_metadata_info,
         &user_wallet_info,
         &new_token_account_info,
-        &[],
     )?;
 
     let (trade_history_key, trade_history_bump_seed) =
@@ -170,9 +168,9 @@ pub fn buy<'a>(
         program_id,
         trade_history_info,
         pass_book_info,
+        user_wallet_info,
         payer_account_info,
         rent_info,
-        system_account_info,
         system_account_info,
         trade_history_signer_seeds,
     )?;
@@ -185,21 +183,9 @@ pub fn buy<'a>(
         }
     }
 
-    if let Some(market_authority) = passbook.market_authority {
-        let market_authority_account_info = next_account_info(account_info_iter)?;
-        assert_signer(market_authority_account_info)?;
-        assert_account_key(
-            market_authority_account_info,
-            &market_authority,
-            Some(NFTPassError::InvalidMarketAuthority),
-        )?;
-    };
-
-    let master_metadata = Metadata::from_account_info(master_metadata_info)?;
-
     distribute_payout(
-       args. market_fee_basis_point as u64,
-       args.referral_share as u64,
+        args.market_fee_basis_point as u64,
+        args.referral_share as u64,
         args.referral_kick_back_share as u64,
         &master_metadata,
         &passbook,
@@ -269,6 +255,7 @@ pub fn pay_account<'a>(
             return Err(NFTPassError::PriceTokenMismatch.into());
         }
         if token_account.owner != *payout_account.key {
+            msg!("PAYOUT TOKEN OWNER DOES NOT MATCH PAYOUT ACCOUNT ----------------->");
             return Err(ProgramError::IllegalOwner);
         }
     }
@@ -279,9 +266,10 @@ pub fn pay_account<'a>(
         user_wallet,
         amount,
     )?;
-    payout.cash_in = payout.cash_in
-    .checked_add(passbook.price)
-    .ok_or(NFTPassError::MathOverflow)?;
+    payout.cash_in = payout
+        .cash_in
+        .checked_add(amount)
+        .ok_or(NFTPassError::MathOverflow)?;
     Payout::pack(payout, *payout_account.data.borrow_mut())?;
     Ok(())
 }
@@ -399,7 +387,7 @@ pub fn distribute_payout_for_creators<'a>(
     payout_accounts: &[PayoutInfo<'a>],
 ) -> Result<(), ProgramError> {
     if amount == 0 {
-        return Ok(())
+        return Ok(());
     }
     for creator in payout_accounts {
         let creator_amount = if metadata.primary_sale_happened {
@@ -432,7 +420,7 @@ pub fn distribute_referral_payout_for_creators<'a>(
     payout_accounts: &[PayoutInfo<'a>],
 ) -> Result<(), ProgramError> {
     if amount == 0 {
-        return Ok(())
+        return Ok(());
     }
     for creator in payout_accounts {
         let creator_amount = calculate_shares(amount, creator.share as u64)?;

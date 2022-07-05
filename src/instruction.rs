@@ -311,9 +311,10 @@ pub fn init_pass_book(
         accounts.push(AccountMeta::new(referral.payout_account, false));
         accounts.push(AccountMeta::new(referral.token_account, false))
     }
-
+    
     accounts.push(AccountMeta::new_readonly(spl_token::id(), false));
     accounts.push(AccountMeta::new_readonly(mpl_token_metadata::id(), false));
+    accounts.push(AccountMeta::new_readonly(spl_associated_token_account::id(), false));
 
     Instruction::new_with_borsh(
         *program_id,
@@ -330,7 +331,7 @@ pub fn buy_pass(
     store: &Pubkey,
     vault_token: &Pubkey,
     user_wallet: &Pubkey,
-    user_wallet_account: &Pubkey,
+    user_token_account: &Pubkey,
     payer: &Pubkey,
     new_metadata: &Pubkey,
     new_edition: &Pubkey,
@@ -346,20 +347,20 @@ pub fn buy_pass(
     creator_payout: &[PayoutInfoArgs],
 ) -> Instruction {
     let mut accounts = vec![
-        AccountMeta::new(*passbook, true),
-        AccountMeta::new(*store, true),
+        AccountMeta::new(*passbook, false),
+        AccountMeta::new(*store, false),
         AccountMeta::new(*vault_token, false),
         AccountMeta::new(*user_wallet, true),
-        AccountMeta::new_readonly(*user_wallet_account, true),
-        AccountMeta::new_readonly(*payer, true),
-        AccountMeta::new_readonly(*new_metadata, true),
-        AccountMeta::new_readonly(*new_edition, true),
-        AccountMeta::new_readonly(*new_mint, true),
-        AccountMeta::new(*master_metadata, true),
-        AccountMeta::new_readonly(*master_edition, true),
-        AccountMeta::new_readonly(*edition_marker, true),
-        AccountMeta::new_readonly(*new_token_account, true),
-        AccountMeta::new_readonly(*trade_history, true),
+        AccountMeta::new(*user_token_account, false),
+        AccountMeta::new(*payer, true),
+        AccountMeta::new(*new_metadata, false),
+        AccountMeta::new(*new_edition, false),
+        AccountMeta::new(*new_mint, false),
+        AccountMeta::new(*master_metadata, false),
+        AccountMeta::new(*master_edition, false),
+        AccountMeta::new(*edition_marker, false),
+        AccountMeta::new(*new_token_account, false),
+        AccountMeta::new(*trade_history, false),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),    
@@ -384,7 +385,8 @@ pub fn buy_pass(
     }
 
     accounts.push(AccountMeta::new_readonly(mpl_token_metadata::id(), false));
-
+    accounts.push(AccountMeta::new_readonly(spl_associated_token_account::id(), false));
+    
     Instruction::new_with_borsh(
         *program_id,
         &NFTPassInstruction::BuyPass(args),

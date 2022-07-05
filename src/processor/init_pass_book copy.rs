@@ -7,8 +7,8 @@ use crate::{
     instruction::InitPassBookArgs,
     math::SafeMath,
     state::{
-        InitPassBook, PassBook, PassStore, Payout, MAX_NAME_LENGTH, MAX_PASS_BOOK_LEN,
-        MAX_URI_LENGTH, PREFIX,
+        InitPassBook, PassBook, PassStore, Payout, MAX_NAME_LENGTH,
+        MAX_PASS_BOOK_LEN, MAX_URI_LENGTH, PREFIX,
     },
     utils::*,
 };
@@ -28,7 +28,6 @@ use mpl_token_metadata::{
     state::{Key, MasterEdition, MasterEditionV2, Metadata, EDITION},
     utils::{assert_derivation, assert_initialized},
 };
-use spl_associated_token_account::get_associated_token_address;
 
 use std::slice::Iter;
 
@@ -57,8 +56,10 @@ pub fn init_pass_book(
     let clock = &Clock::from_account_info(clock_info)?;
 
     assert_signer(authority_info)?;
-    assert_owned_by(source_info, &spl_token::id())?;
+
     assert_owned_by(mint_info, &spl_token::id())?;
+    assert_owned_by(source_info, &spl_token::id())?;
+    assert_owned_by(token_account_info, &spl_token::id())?;
     assert_owned_by(master_edition_info, &mpl_token_metadata::id())?;
     assert_owned_by(master_metadata_info, &mpl_token_metadata::id())?;
 
@@ -96,21 +97,13 @@ pub fn init_pass_book(
         Some(NFTPassError::InvalidAuthorityKey),
     )?;
 
-    let master_metadata = Metadata::from_account_info(master_metadata_info)?;
-
-    assert_account_key(
-        mint_info,
-        &master_metadata.mint,
-        Some(NFTPassError::InvalidMintKey),
-    )?;
-
     let (pass_book_key, pass_book_bump_seed) =
-        find_pass_book_program_address(program_id, &master_metadata.mint);
+        find_pass_book_program_address(program_id, mint_info.key);
 
     let pass_book_signer_seeds = &[
         PREFIX.as_bytes(),
         program_id.as_ref(),
-        &master_metadata.mint.to_bytes(),
+        &mint_info.key.to_bytes(),
         &[pass_book_bump_seed],
     ];
     if pass_book_info.key != &pass_book_key {
@@ -163,6 +156,12 @@ pub fn init_pass_book(
     if master_edition.key() != Key::MasterEditionV2 {
         return Err(MetadataError::InvalidEditionKey.into());
     }
+    let master_metadata = Metadata::from_account_info(master_metadata_info)?;
+    assert_account_key(
+        mint_info,
+        &master_metadata.mint,
+        Some(NFTPassError::InvalidMintKey),
+    )?;
 
     assert_derivation(
         &token_metadata_program_id,
@@ -180,15 +179,9 @@ pub fn init_pass_book(
         return Err(MetadataError::MintMismatch.into());
     }
 
-    let associated_token_account =
-        get_associated_token_address(&pass_book_key, &master_metadata.mint);
+    // initialize token account to hold mint tokens
+    spl_initialize_account(token_account_info, mint_info, pass_book_info, rent_info)?;
 
-    // Check, that provided destination is associated token account
-    if associated_token_account != *token_account_info.key {
-        return Err(NFTPassError::InvalidTokenAccount.into());
-    }
-
-    let _: Account = assert_initialized(token_account_info)?;
     // Transfer from source to token account
     spl_token_transfer(
         source_info.clone(),
@@ -277,7 +270,7 @@ pub fn init_pass_book(
     }
 
     pass_book.init(InitPassBook {
-        mint: master_metadata.mint,
+        mint: *mint_info.key,
         name: args.name,
         uri: args.uri,
         description: args.description,
@@ -293,7 +286,7 @@ pub fn init_pass_book(
         market_authority: market_authority,
         token: *token_account_info.key,
         creators: creators,
-        pieces_in_one_wallet: args.pieces_in_one_wallet,
+        pieces_in_one_wallet: args.pieces_in_one_wallet
     });
 
     pass_book.puff_out_data_fields();
@@ -357,9 +350,11 @@ pub fn get_or_create_payout_account<'a>(
     let treasury_holder_info = next_account_info(remaining_accounts)?;
     let (payout_key, payout_bump_seed) =
         find_payout_program_address(program_id, authority, price_mint_info.key);
-
-    msg!("PAYOUT INFO KEY -----------------> {}", payout_info.key);
-    msg!("PAYOUT DERIVED KEY -----------------> {}", payout_key);
+    
+    msg!("AUTHORITY: {}", authority.to_string());
+    msg!("PAYOUT KEY: {}", payout_key.to_string());
+    msg!("PAYOUT INFO KEY: {}", payout_info.key.to_string());
+    msg!("MINT KEY: {}", price_mint_info.key.to_string());
     assert_account_key(
         payout_info,
         &payout_key,
@@ -384,15 +379,13 @@ pub fn get_or_create_payout_account<'a>(
                     return Err(ProgramError::InvalidAccountData);
                 }
             } else {
-                let associated_token_account =
-                    get_associated_token_address(&payout_key, &price_mint_info.key);
-
-                // Check, that provided destination is associated token account
-                if associated_token_account != *treasury_holder_info.key {
-                    return Err(NFTPassError::InvalidPayerTokenAccount.into());
-                }
-
-                let _: Account = assert_initialized(treasury_holder_info)?;
+                assert_owned_by(treasury_holder_info, &spl_token::id())?;
+                spl_initialize_account(
+                    treasury_holder_info,
+                    price_mint_info,
+                    payout_info,
+                    rent_sysvar_info,
+                )?;
                 msg!("Token initialized");
             }
             // create payout account
@@ -411,7 +404,7 @@ pub fn get_or_create_payout_account<'a>(
             let mut data = Payout::unpack_unchecked(&payout_info.data.borrow_mut())?;
 
             data.init(*authority, *price_mint_info.key, *treasury_holder_info.key);
-            Payout::pack(data, *payout_info.data.borrow_mut())?;
+            Payout::pack( data, *payout_info.data.borrow_mut())?;
             Ok(())
         }
     }

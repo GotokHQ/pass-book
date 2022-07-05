@@ -5,13 +5,20 @@ mod metadata;
 mod user;
 mod assert;
 mod token;
+mod edition_marker;
+mod trade_history;
+mod store;
+mod payout;
 
 pub use master_edition_v2::TestMasterEditionV2;
 pub use pass_book::TestPassBook;
 pub use metadata::TestMetadata;
-use solana_program::instruction::Instruction;
 pub use token::TestSplToken;
-pub use user::User;
+pub use user::*;
+pub use edition_marker::TestEditionMarker;
+pub use trade_history::TestTradeHistory;
+pub use store::TestStore;
+pub use payout::TestPayout;
 pub use assert::*;
 
 use solana_program_test::*;
