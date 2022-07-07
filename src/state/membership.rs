@@ -16,7 +16,9 @@ pub const MAX_MEMBERSHIP_LEN: usize = 1 //account type
 + 33 // pass
 + 33 // passbook
 + 9 // expires
-+ 1; // memebership state
++ 1 // memebership state
++ 1 //
++ USES_LENGTH;
 
 /// Pack state
 #[derive(Clone, Debug, PartialEq, BorshDeserialize, BorshSerialize, BorshSchema)]
@@ -43,6 +45,8 @@ pub struct Membership {
     pub account_type: AccountType,
     /// store
     pub store: Pubkey,
+    /// Membership state
+    pub state: MembershipState,
     /// owner
     pub owner: Pubkey,
     /// Membership book
@@ -51,9 +55,8 @@ pub struct Membership {
     pub pass: Option<Pubkey>,
     /// pass expiration in unix timestamp
     pub expires_at: Option<u64>,
-    /// Membership state
-    pub state: MembershipState,
     pub activated_at: Option<u64>,
+    pub uses: Option<Uses>,
 }
 
 impl Membership {
@@ -68,6 +71,7 @@ impl Membership {
         self.expires_at = None;
         self.activated_at = None;
         self.state = MembershipState::NotActivated;
+        self.uses = None;
     }
 }
 

@@ -5,7 +5,7 @@ use crate::{
     find_membership_program_address, find_pass_store_program_address,
     find_trade_history_program_address, id,
     instruction::BuyPassArgs,
-    state::{Membership, MembershipState, PassBook, PassStore, Payout, TradeHistory, PREFIX},
+    state::{Membership, MembershipState, PassBook, Payout, Store, TradeHistory, Uses, PREFIX},
     utils::*,
 };
 
@@ -49,9 +49,9 @@ pub fn buy<'a>(
 
     let mut passbook = PassBook::unpack(&pass_book_info.data.borrow_mut())?;
 
-    let mut pass_store = PassStore::unpack(&store_info.data.borrow_mut())?;
+    let mut pass_store = Store::unpack(&store_info.data.borrow_mut())?;
 
-    let (store_key, _) = find_pass_store_program_address(program_id, &passbook.creator);
+    let (store_key, _) = find_pass_store_program_address(program_id, &passbook.authority);
     assert_account_key(store_info, &store_key, Some(NFTPassError::InvalidStoreKey))?;
 
     let is_native = cmp_pubkeys(&passbook.mint, &spl_token::native_mint::id());
@@ -100,14 +100,6 @@ pub fn buy<'a>(
         trade_history_signer_seeds,
     )?;
 
-    // Check, that user not reach buy limit
-    // todo, add to passbook
-    // if let Some(pieces_in_one_wallet) = passbook.pieces_in_one_wallet {
-    //     if trade_history.already_bought == pieces_in_one_wallet {
-    //         return Err(NFTPassError::UserReachBuyLimit.into());
-    //     }
-    // }
-
     let (membership_key, membership_bump_seed) =
         find_membership_program_address(program_id, &store_key, user_wallet_info.key);
     assert_account_key(
@@ -136,7 +128,7 @@ pub fn buy<'a>(
         None
     };
 
-    let mut membership = get_or_create_membership(
+    let (mut membership, is_new_membership) = get_or_create_membership(
         program_id,
         membership_info,
         user_wallet_info,
@@ -161,7 +153,12 @@ pub fn buy<'a>(
     membership.expires_at = expires_at;
     membership.passbook = Some(*pass_book_info.key);
     membership.state = MembershipState::Activated;
-
+    if let Some(max_uses) = passbook.max_uses {
+        membership.uses = Some(Uses {
+            remaining: 0,
+            total: max_uses,
+        })
+    }
     distribute_payout(
         args.market_fee_basis_point as u64,
         args.referral_share as u64,
@@ -173,12 +170,13 @@ pub fn buy<'a>(
         clock,
         account_info_iter,
     )?;
-
-    pass_store.increment_pass_count()?;
+    if is_new_membership {
+        pass_store.increment_membership_count()?;
+    }
     trade_history.increment_already_bought()?;
     passbook.increment_supply()?;
     PassBook::pack(passbook, *pass_book_info.data.borrow_mut())?;
-    PassStore::pack(pass_store, *store_info.data.borrow_mut())?;
+    Store::pack(pass_store, *store_info.data.borrow_mut())?;
     TradeHistory::pack(trade_history, *trade_history_info.data.borrow_mut())?;
     Membership::pack(membership, *membership_info.data.borrow_mut())?;
     Ok(())
@@ -257,7 +255,7 @@ pub fn distribute_payout<'a>(
     referral_share: u64,
     referral_kick_back: u64,
     passbook: &PassBook,
-    store: &PassStore,
+    store: &Store,
     user_wallet: AccountInfo<'a>,
     user_token_account: AccountInfo<'a>,
     clock: &Clock,
@@ -273,7 +271,7 @@ pub fn distribute_payout<'a>(
     let creator_payout_info = next_account_info(remaining_accounts)?;
     let creator_payout_token_info = next_account_info(remaining_accounts)?;
     let creator_payout = PayoutInfo {
-        authority: passbook.creator,
+        authority: passbook.authority,
         payout_account: creator_payout_info,
         token_account: creator_payout_token_info,
         share: 100,
@@ -443,13 +441,13 @@ pub fn get_or_create_membership<'a>(
     rent_sysvar_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
     signers_seeds: &[&[u8]],
-) -> Result<Membership, ProgramError> {
+) -> Result<(Membership, bool), ProgramError> {
     // set up pass store account
 
     let unpack = Membership::unpack(&membership_info.data.borrow_mut());
 
     let proving_process = match unpack {
-        Ok(data) => Ok(data),
+        Ok(data) => Ok((data, false)),
         Err(_) => {
             // create pass store account
             create_or_allocate_account_raw(
@@ -467,7 +465,7 @@ pub fn get_or_create_membership<'a>(
             let mut data = Membership::unpack_unchecked(&membership_info.data.borrow_mut())?;
 
             data.init(*store_info.key, *user_wallet_info.key);
-            Ok(data)
+            Ok((data, true))
         }
     };
 

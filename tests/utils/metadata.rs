@@ -48,7 +48,7 @@ impl TestMetadata {
         name: String,
         symbol: String,
         uri: String,
-        creator: Option<&Keypair>,
+        authority: Option<&Keypair>,
         seller_fee_basis_points: u16,
         is_mutable: bool,
         token_authority: &Pubkey
@@ -64,7 +64,7 @@ impl TestMetadata {
             None,
         )
         .await?;
-        let creators = if let Some(user) = creator {
+        let creators = if let Some(user) = authority {
             vec![
                 Creator {
                     address: user.pubkey(),

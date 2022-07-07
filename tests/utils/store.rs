@@ -1,4 +1,4 @@
-use nft_pass_book::{find_pass_store_program_address, state::PassStore};
+use nft_pass_book::{find_pass_store_program_address, state::Store};
 use solana_program::program_pack::Pack;
 use solana_program_test::ProgramTestContext;
 use solana_sdk::pubkey::Pubkey;
@@ -17,8 +17,8 @@ impl TestStore {
         TestStore { pubkey }
     }
 
-    pub async fn get_data(&self, context: &mut ProgramTestContext) -> PassStore {
+    pub async fn get_data(&self, context: &mut ProgramTestContext) -> Store {
         let account = get_account(context, &self.pubkey).await;
-        PassStore::unpack_unchecked(&account.data).unwrap()
+        Store::unpack_unchecked(&account.data).unwrap()
     }
 }

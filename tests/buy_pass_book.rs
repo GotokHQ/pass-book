@@ -96,10 +96,9 @@ async fn success_buy_with_spl_token() {
                 uri: uri.clone(),
                 description: description.clone(),
                 mutable: true,
-                duration: Some(30), //30 mins duration per session
+                max_uses: Some(30), //30 mins max_uses per session
                 access: Some(30),   //valid for 30 days
                 max_supply: Some(5),
-                blur_hash: None,
                 price: 10_000_000,
                 has_referrer: referrer.is_some(), // Some(referrer.pubkey()),
                 has_market_authority: market_place_user.is_some(),
@@ -205,10 +204,9 @@ async fn success_buy_with_native_token() {
                 uri: uri.clone(),
                 description: description.clone(),
                 mutable: true,
-                duration: Some(30), //30 mins duration per session
+                max_uses: Some(30), //30 mins max_uses per session
                 access: Some(30),   //valid for 30 days
                 max_supply: Some(5),
-                blur_hash: None,
                 price: 10_000_000,
                 has_referrer: referrer.is_some(), // Some(referrer.pubkey()),
                 has_market_authority: market_place_user.is_some(),
@@ -337,10 +335,9 @@ async fn failure_multiple_buy() {
                 uri: uri.clone(),
                 description: description.clone(),
                 mutable: true,
-                duration: Some(30), //30 mins duration per session
+                max_uses: Some(30), //30 mins max_uses per session
                 access: Some(30),   //valid for 30 days
                 max_supply: Some(5),
-                blur_hash: None,
                 price: 10_000_000,
                 has_referrer: referrer.is_some(), // Some(referrer.pubkey()),
                 has_market_authority: market_place_user.is_some(),

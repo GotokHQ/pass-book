@@ -294,10 +294,9 @@ pub async fn setup_pass_book(mutable: bool) -> (ProgramTestContext, TestPassBook
                 uri: uri.clone(),
                 description: description.clone(),
                 mutable: mutable,
-                duration: Some(30), //30 mins duration per session
+                max_uses: Some(30), //30 mins max_uses per session
                 access: Some(30),   //valid for 30 days
                 max_supply: Some(5),
-                blur_hash: None,
                 price: 10_000_000,
                 has_referrer: referrer.is_some(), // Some(referrer.pubkey()),
                 has_market_authority: market_place_user.is_some(),

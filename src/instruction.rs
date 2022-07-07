@@ -26,11 +26,9 @@ pub struct InitPassBookArgs {
     /// The no of days this pass can be used to access the service
     pub access: Option<u64>,
     /// The no of minutes consumed for each use of this pass
-    pub duration: Option<u64>,
+    pub max_uses: Option<u64>,
     /// The maximum number of passes that can be printed
     pub max_supply: Option<u64>,
-    /// blur hash of image
-    pub blur_hash: Option<String>,
     /// price
     pub price: u64,
     /// Indicates the presence of a referral account in the account list
@@ -51,8 +49,6 @@ pub struct EditPassBookArgs {
     pub description: Option<String>,
     /// URI
     pub uri: Option<String>,
-    /// Blurhash
-    pub blur_hash: Option<String>,
     /// Price
     pub price: Option<u64>,
     /// If true authority can make changes at deactivated phase
@@ -125,7 +121,7 @@ pub enum NFTPassInstruction {
     ///   0.  `[writable]` Uninitialized master pass account with address as pda of (PDA ['pass', program id, master metadata mint id] )
     ///   1.  `[writer]` Source token account that holds MasterEdition token
     ///   2.  `[writer]` token_account (program account to hold MasterEdition token)
-    ///   3.  `[writer]` PassStore account with pda of ['pass', program id, authority, 'store']
+    ///   3.  `[writer]` Store account with pda of ['pass', program id, authority, 'store']
     ///   4.  `[signer]` Authority of pass account
     ///   5.  `[signer]` payer
     ///   6.  `[]` Master Metadata mint
@@ -255,7 +251,7 @@ pub fn init_pass_book(
     program_id: &Pubkey,
     passbook: &Pubkey,
     store: &Pubkey,
-    creator: &Pubkey,
+    authority: &Pubkey,
     payer: &Pubkey,
     mint: &Pubkey,
     creator_payout: &PayoutInfoArgs,
@@ -264,9 +260,9 @@ pub fn init_pass_book(
     args: InitPassBookArgs,
 ) -> Instruction {
     let mut accounts = vec![
-        AccountMeta::new(*passbook, false),
+        AccountMeta::new(*passbook, true),
         AccountMeta::new(*store, false),
-        AccountMeta::new_readonly(*creator, true),
+        AccountMeta::new_readonly(*authority, true),
         AccountMeta::new_readonly(*payer, true),
         AccountMeta::new_readonly(*mint, false),
         AccountMeta::new_readonly(sysvar::clock::id(), false),

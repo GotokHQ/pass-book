@@ -4,10 +4,7 @@ use crate::{
     error::NFTPassError,
     find_pass_store_program_address, find_payout_program_address,
     instruction::InitPassBookArgs,
-    state::{
-        InitPassBook, PassBook, PassStore, Payout, MAX_NAME_LENGTH,
-        MAX_URI_LENGTH, PREFIX,
-    },
+    state::{InitPassBook, PassBook, Payout, Store, MAX_NAME_LENGTH, MAX_URI_LENGTH, PREFIX},
     utils::*,
 };
 
@@ -44,6 +41,7 @@ pub fn init_pass_book(
     let system_account_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
 
+    assert_signer(pass_book_info)?;
     assert_signer(creator_info)?;
 
     let is_native = cmp_pubkeys(mint_info.key, &spl_token::native_mint::id());
@@ -60,11 +58,11 @@ pub fn init_pass_book(
         PREFIX.as_bytes(),
         program_id.as_ref(),
         &creator_info.key.to_bytes(),
-        PassStore::PREFIX.as_bytes(),
+        Store::PREFIX.as_bytes(),
         &[store_bump_seed],
     ];
 
-    let mut store: PassStore = get_pass_store_data(
+    let mut store: Store = get_pass_store_data(
         program_id,
         store_info,
         creator_info,
@@ -80,7 +78,15 @@ pub fn init_pass_book(
         Some(NFTPassError::InvalidCreatorKey),
     )?;
 
-    let mut pass_book = PassBook::unpack_unchecked(&pass_book_info.data.borrow_mut())?;
+    let mut pass_book = get_or_create_passbook(
+        program_id,
+        pass_book_info,
+        payer_account_info,
+        rent_info,
+        system_account_info,
+    )?;
+
+    // PassBook::unpack_unchecked(&pass_book_info.data.borrow_mut())?;
 
     if pass_book.is_initialized() {
         return Err(ProgramError::AccountAlreadyInitialized);
@@ -94,8 +100,8 @@ pub fn init_pass_book(
         return Err(NFTPassError::UriTooLong.into());
     }
 
-    if let Some(duration) = args.duration {
-        if duration == 0 {
+    if let Some(max_uses) = args.max_uses {
+        if max_uses == 0 {
             return Err(NFTPassError::WrongDuration.into());
         }
     }
@@ -158,12 +164,11 @@ pub fn init_pass_book(
         name: args.name,
         uri: args.uri,
         description: args.description,
-        creator: *creator_info.key,
+        authority: *creator_info.key,
         mutable: args.mutable,
-        duration: args.duration,
+        max_uses: args.max_uses,
         access: args.access,
         max_supply: args.max_supply,
-        blur_hash: args.blur_hash,
         created_at: clock.unix_timestamp as u64,
         price: args.price,
         mint: *mint_info.key,
@@ -174,7 +179,7 @@ pub fn init_pass_book(
 
     PassBook::pack(pass_book, *pass_book_info.data.borrow_mut())?;
     store.increment_pass_book_count()?;
-    PassStore::pack(store, *store_info.data.borrow_mut())?;
+    Store::pack(store, *store_info.data.borrow_mut())?;
     Ok(())
 }
 
@@ -186,10 +191,10 @@ pub fn get_pass_store_data<'a>(
     rent_sysvar_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
     signers_seeds: &[&[u8]],
-) -> Result<PassStore, ProgramError> {
+) -> Result<Store, ProgramError> {
     // set up pass store account
 
-    let unpack = PassStore::unpack(&store_info.data.borrow_mut());
+    let unpack = Store::unpack(&store_info.data.borrow_mut());
 
     let proving_process = match unpack {
         Ok(data) => Ok(data),
@@ -201,16 +206,50 @@ pub fn get_pass_store_data<'a>(
                 rent_sysvar_info,
                 system_program_info,
                 payer_info,
-                PassStore::LEN,
+                Store::LEN,
                 signers_seeds,
             )?;
 
             msg!("New pass store account was created");
 
-            let mut data = PassStore::unpack_unchecked(&store_info.data.borrow_mut())?;
+            let mut data = Store::unpack_unchecked(&store_info.data.borrow_mut())?;
 
             data.init(*creator_info.key);
             Ok(data)
+        }
+    };
+
+    proving_process
+}
+
+pub fn get_or_create_passbook<'a>(
+    program_id: &Pubkey,
+    passbook_info: &AccountInfo<'a>,
+    payer_info: &AccountInfo<'a>,
+    rent_sysvar_info: &AccountInfo<'a>,
+    system_program_info: &AccountInfo<'a>,
+) -> Result<PassBook, ProgramError> {
+    // set up pass store account
+
+    let unpack = PassBook::unpack(&passbook_info.data.borrow_mut());
+
+    let proving_process = match unpack {
+        Ok(data) => Ok(data),
+        Err(_) => {
+            // create pass store account
+            create_or_new_account_raw(
+                *program_id,
+                passbook_info,
+                rent_sysvar_info,
+                system_program_info,
+                payer_info,
+                PassBook::LEN,
+            )?;
+
+            msg!("New passbook account was created");
+            Ok(PassBook::unpack_unchecked(
+                &passbook_info.data.borrow_mut(),
+            )?)
         }
     };
 

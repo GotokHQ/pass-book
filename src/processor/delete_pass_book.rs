@@ -27,7 +27,7 @@ pub fn delete_pass_book(program_id: &Pubkey, accounts: &[AccountInfo]) -> Progra
 
     assert_account_key(
         authority_account,
-        &pass_book.creator,
+        &pass_book.authority,
         Some(NFTPassError::InvalidCreatorKey),
     )?;
 

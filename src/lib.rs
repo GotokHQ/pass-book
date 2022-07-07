@@ -12,12 +12,12 @@ pub const PROGRAM_VERSION: u8 = 1;
 #[cfg(not(feature = "no-entrypoint"))]
 pub mod entrypoint;
 
-
 // Export current sdk types for downstream users building with a different sdk version
 pub use solana_program;
 use solana_program::pubkey::Pubkey;
-use state::{PassStore, COLLECTION_MINT, PREFIX, Payout, TradeHistory, Membership};
-
+use state::{
+    Membership, Payout, Store, StoreAuthority, TradeHistory, UseAuthority, COLLECTION_MINT, PREFIX,
+};
 
 solana_program::declare_id!("passjvPvHQWN4SvBCmHk1gdrtBvoHRERtQK9MKemreQ");
 
@@ -45,14 +45,18 @@ pub fn find_pass_store_program_address(program_id: &Pubkey, authority: &Pubkey) 
             PREFIX.as_bytes(),
             program_id.as_ref(),
             &authority.to_bytes(),
-            PassStore::PREFIX.as_bytes(),
+            Store::PREFIX.as_bytes(),
         ],
         program_id,
     )
 }
 
 /// Generates payout account address
-pub fn find_payout_program_address(program_id: &Pubkey, authority: &Pubkey, mint: &Pubkey) -> (Pubkey, u8) {
+pub fn find_payout_program_address(
+    program_id: &Pubkey,
+    authority: &Pubkey,
+    mint: &Pubkey,
+) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
             PREFIX.as_bytes(),
@@ -66,7 +70,11 @@ pub fn find_payout_program_address(program_id: &Pubkey, authority: &Pubkey, mint
 }
 
 /// Generates trade history account address
-pub fn find_trade_history_program_address(program_id: &Pubkey, passbook: &Pubkey, wallet: &Pubkey) -> (Pubkey, u8) {
+pub fn find_trade_history_program_address(
+    program_id: &Pubkey,
+    passbook: &Pubkey,
+    wallet: &Pubkey,
+) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
             PREFIX.as_bytes(),
@@ -79,21 +87,20 @@ pub fn find_trade_history_program_address(program_id: &Pubkey, passbook: &Pubkey
     )
 }
 
-
 /// Generates master pass address
 pub fn find_pass_book_program_address(program_id: &Pubkey, mint: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[
-            PREFIX.as_bytes(),
-            program_id.as_ref(),
-            &mint.to_bytes()
-        ],
+        &[PREFIX.as_bytes(), program_id.as_ref(), &mint.to_bytes()],
         program_id,
     )
 }
 
 /// Generate membership pda
-pub fn find_membership_program_address(program_id: &Pubkey, store: &Pubkey, wallet: &Pubkey) -> (Pubkey, u8) {
+pub fn find_membership_program_address(
+    program_id: &Pubkey,
+    store: &Pubkey,
+    wallet: &Pubkey,
+) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
             PREFIX.as_bytes(),
@@ -101,6 +108,42 @@ pub fn find_membership_program_address(program_id: &Pubkey, store: &Pubkey, wall
             &store.to_bytes(),
             &wallet.to_bytes(),
             Membership::PREFIX.as_bytes(),
+        ],
+        program_id,
+    )
+}
+
+/// Generate use authority pda
+pub fn find_use_authority_program_address(
+    program_id: &Pubkey,
+    membership: &Pubkey,
+    user: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            PREFIX.as_bytes(),
+            program_id.as_ref(),
+            &membership.to_bytes(),
+            &user.to_bytes(),
+            UseAuthority::PREFIX.as_bytes(),
+        ],
+        program_id,
+    )
+}
+
+/// Generate store authority pda
+pub fn find_store_authority_program_address(
+    program_id: &Pubkey,
+    store: &Pubkey,
+    user: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            PREFIX.as_bytes(),
+            program_id.as_ref(),
+            &store.to_bytes(),
+            &user.to_bytes(),
+            StoreAuthority::PREFIX.as_bytes(),
         ],
         program_id,
     )

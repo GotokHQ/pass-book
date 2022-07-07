@@ -32,7 +32,7 @@ pub enum NFTPassError {
     #[error("InvalidUpdateAuthorityKey")]
     InvalidUpdateAuthorityKey,
 
-    /// Invalid PassStore Key
+    /// Invalid Store Key
     #[error("InvalidStoreKey")]
     InvalidStoreKey,
 
@@ -100,8 +100,8 @@ pub enum NFTPassError {
     #[error("Wrong validity period")]
     WrongValidityPeriod,
 
-    /// Wrong duration
-    #[error("Wrong duration")]
+    /// Wrong max_uses
+    #[error("Wrong max_uses")]
     WrongDuration,
 
     /// Master edition should have unlimited supply

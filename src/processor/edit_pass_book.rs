@@ -27,16 +27,16 @@ pub fn edit_pass_book(
     assert_owned_by(pass_book_account, program_id)?;
     assert_signer(&authority_account)?;
 
-    let price_mint_account = next_account_info(account_info_iter).ok();
+    let mint_account = next_account_info(account_info_iter).ok();
 
     let mut pass_book = PassBook::unpack(&pass_book_account.data.borrow_mut())?;
 
-    assert_account_key(authority_account, &pass_book.creator, 
+    assert_account_key(authority_account, &pass_book.authority, 
         Some(NFTPassError::InvalidCreatorKey),)?;
 
     pass_book.assert_able_to_edit()?;
 
-    apply_changes(&mut pass_book, args, price_mint_account)?;
+    apply_changes(&mut pass_book, args, mint_account)?;
 
     pass_book.puff_out_data_fields();
 
@@ -45,7 +45,7 @@ pub fn edit_pass_book(
     Ok(())
 }
 
-fn apply_changes(pass_book: &mut PassBook, changes: EditPassBookArgs, price_mint_account: Option<&AccountInfo>) -> Result<(), ProgramError> {
+fn apply_changes(pass_book: &mut PassBook, changes: EditPassBookArgs, mint_account: Option<&AccountInfo>) -> Result<(), ProgramError> {
     if let Some(new_name) = changes.name {
         if new_name == pass_book.name {
             return Err(NFTPassError::CantSetTheSameValue.into());
@@ -87,26 +87,17 @@ fn apply_changes(pass_book: &mut PassBook, changes: EditPassBookArgs, price_mint
         pass_book.price = new_price;
     }
 
-    if let Some(new_blur_hash) = changes.blur_hash {
-        if let Some(old_hash) = &pass_book.blur_hash {
-            if new_blur_hash == *old_hash {
-                return Err(NFTPassError::CantSetTheSameValue.into());
-            }
-        };
-        pass_book.blur_hash = Some(new_blur_hash);
-    }
-
-    if let Some(new_price_mint_account) = price_mint_account {
-        if *new_price_mint_account.key == pass_book.mint {
+    if let Some(new_mint_account) = mint_account {
+        if *new_mint_account.key == pass_book.mint {
             return Err(NFTPassError::CantSetTheSameValue.into());
         }
-        let is_native = cmp_pubkeys(new_price_mint_account.key, &spl_token::native_mint::id());
+        let is_native = cmp_pubkeys(new_mint_account.key, &spl_token::native_mint::id());
 
         if !is_native {
-            assert_owned_by(new_price_mint_account, &spl_token::id())?;
+            assert_owned_by(new_mint_account, &spl_token::id())?;
         }
 
-        pass_book.mint = *new_price_mint_account.key;
+        pass_book.mint = *new_mint_account.key;
     }
 
     Ok(())

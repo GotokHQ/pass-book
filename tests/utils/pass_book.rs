@@ -2,11 +2,11 @@ use crate::*;
 use nft_pass_book::{
     find_payout_program_address,
     instruction::{self, EditPassBookArgs},
-    state::{PassBook, PassStore, PayoutInfoArgs},
+    state::{PassBook, PayoutInfoArgs, Store},
     utils::cmp_pubkeys,
 };
 use solana_program::{
-    instruction::Instruction, program_pack::Pack, pubkey::Pubkey, system_instruction,
+    instruction::Instruction, program_pack::Pack, pubkey::Pubkey,
 };
 use solana_program_test::*;
 
@@ -92,7 +92,6 @@ impl TestPassBook {
                     name,
                     description,
                     uri,
-                    blur_hash,
                     price,
                     mutable,
                 },
@@ -202,14 +201,14 @@ impl TestPassBook {
         } else {
             None
         };
-        let rent = context.banks_client.get_rent().await?;
-        instructions.push(system_instruction::create_account(
-            &context.payer.pubkey(),
-            &self.account.pubkey(),
-            rent.minimum_balance(PassBook::LEN),
-            PassBook::LEN as u64,
-            &nft_pass_book::id(),
-        ));
+        // let rent = context.banks_client.get_rent().await?;
+        // instructions.push(system_instruction::create_account(
+        //     &context.payer.pubkey(),
+        //     &self.account.pubkey(),
+        //     rent.minimum_balance(PassBook::LEN),
+        //     PassBook::LEN as u64,
+        //     &nft_pass_book::id(),
+        // ));
         instructions.push(instruction::init_pass_book(
             &nft_pass_book::id(),
             &self.account.pubkey(),
@@ -242,18 +241,19 @@ impl TestPassBook {
         args: instruction::BuyPassArgs,
     ) -> Result<(), BanksClientError> {
         let passbook: PassBook = self.get_data(context).await;
-        let pass_store: PassStore = store.get_data(context).await;
+        let pass_store: Store = store.get_data(context).await;
         let mut signers = vec![&context.payer, &buyer.owner];
         let is_native = cmp_pubkeys(&passbook.mint, &spl_token::native_mint::id());
         let creator_payout_key =
-            find_payout_program_address(&nft_pass_book::id(), &passbook.creator, &passbook.mint).0;
+            find_payout_program_address(&nft_pass_book::id(), &passbook.authority, &passbook.mint)
+                .0;
         let token_account = if is_native {
             creator_payout_key
         } else {
             get_associated_token_address(&creator_payout_key, &passbook.mint)
         };
         let creator_payout = PayoutInfoArgs {
-            authority: passbook.creator,
+            authority: passbook.authority,
             payout_account: creator_payout_key,
             token_account: token_account,
         };

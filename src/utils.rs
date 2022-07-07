@@ -15,7 +15,7 @@ use solana_program::{
     sysvar::{rent::Rent, Sysvar},
 };
 
-use spl_associated_token_account::{instruction::create_associated_token_account};
+use spl_associated_token_account::instruction::create_associated_token_account;
 
 /// Assert uninitialized
 pub fn assert_uninitialized<T: IsInitialized>(account: &T) -> ProgramResult {
@@ -157,18 +157,18 @@ pub fn native_transfer<'a>(
 
 /// SPL transfer instruction.
 pub fn sign_metadata<'a>(
-    creator: &AccountInfo<'a>,
+    authority: &AccountInfo<'a>,
     metadata_account: &AccountInfo<'a>,
     signers_seeds: &[&[&[u8]]],
 ) -> Result<(), ProgramError> {
     let ix = mpl_token_metadata::instruction::sign_metadata(
         mpl_token_metadata::id(),
         *metadata_account.key,
-        *creator.key,
+        *authority.key,
     );
     invoke_signed(
         &ix,
-        &[creator.clone(), metadata_account.clone()],
+        &[authority.clone(), metadata_account.clone()],
         signers_seeds,
     )
 }
@@ -422,10 +422,7 @@ pub fn mpl_update_primary_sale_happened_via_token<'a>(
         *owner.key,
         *token.key,
     );
-    invoke(
-        &tx,
-        &[metadata.clone(), owner.clone(), token.clone()],
-    )
+    invoke(&tx, &[metadata.clone(), owner.clone(), token.clone()])
 }
 
 pub fn calculate_shares(total_amount: u64, shares: u64) -> Result<u64, ProgramError> {
@@ -452,7 +449,10 @@ pub fn calculate_user_shares_by_points(
     .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?)
 }
 
-pub fn calculate_amount_for_points(total_amount: u64, seller_fee_basis_points: u64) -> Result<u64, ProgramError> {
+pub fn calculate_amount_for_points(
+    total_amount: u64,
+    seller_fee_basis_points: u64,
+) -> Result<u64, ProgramError> {
     Ok(total_amount
         .checked_mul(seller_fee_basis_points)
         .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?
@@ -508,4 +508,36 @@ pub fn assert_initialized<T: Pack + IsInitialized>(
     } else {
         Ok(account)
     }
+}
+
+pub fn create_or_new_account_raw<'a>(
+    program_id: Pubkey,
+    new_account_info: &AccountInfo<'a>,
+    rent_sysvar_info: &AccountInfo<'a>,
+    system_program_info: &AccountInfo<'a>,
+    payer_info: &AccountInfo<'a>,
+    size: usize,
+) -> ProgramResult {
+    let rent = &Rent::from_account_info(rent_sysvar_info)?;
+    let required_lamports = rent
+        .minimum_balance(size)
+        .max(1)
+        .saturating_sub(new_account_info.lamports());
+
+    msg!("Transfer {} lamports to the new account", required_lamports);
+    invoke(
+        &system_instruction::create_account(
+            &payer_info.key,
+            new_account_info.key,
+            required_lamports,
+            size.try_into().unwrap(),
+            &program_id,
+        ),
+        &[
+            payer_info.clone(),
+            new_account_info.clone(),
+            system_program_info.clone(),
+        ],
+    )?;
+    Ok(())
 }

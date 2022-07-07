@@ -3,7 +3,7 @@
 use super::*;
 use crate::{
     error::NFTPassError,
-    state::{MAX_DESCRIPTION_LEN, MAX_NAME_LENGTH, MAX_URI_LENGTH, MAX_LENGTH_IMAGE_HASH},
+    state::{MAX_DESCRIPTION_LEN, MAX_NAME_LENGTH, MAX_URI_LENGTH},
     math::SafeMath
 };
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -23,19 +23,17 @@ pub const MAX_PASS_BOOK_LEN: usize = 1 //account type
 +4
 + MAX_URI_LENGTH //uri
 + 32 // authority pub key
-+ 1 // mutable
 + 1 // state
++ 1 // mutable
 + 9 // access
-+ 9 // duration
++ 9 // max_uses
 + 9 // max_supply
-+ 1 + 4 + MAX_LENGTH_IMAGE_HASH //image blur hash
 + 8 // created_at
 + 8 // price
 + 32 // mint
 + 33 // market authority
 + 1
-+ 4
-+ 85;
++ 4;
 
 
 /// Pass state
@@ -64,18 +62,16 @@ pub struct InitPassBook {
     pub description: String,
     /// URI
     pub uri: String,
-    /// PassBook creator
-    pub creator: Pubkey,
+    /// PassBook authority
+    pub authority: Pubkey,
     /// If true authority can make changes at deactivated phase
     pub mutable: bool,
     /// The no of days this pass can be used to access the service
     pub access: Option<u64>,
-    /// The no of minutes consumed for each use of this pass
-    pub duration: Option<u64>,
+    /// The maximum no of uses of this pass
+    pub max_uses: Option<u64>,
     /// Maximum number of passes that can be minted from this pass
     pub max_supply: Option<u64>,
-    /// blur has of image
-    pub blur_hash: Option<String>,
     /// creation date
     pub created_at: u64,
     /// price
@@ -93,7 +89,9 @@ pub struct PassBook {
     /// Account type - PassBook
     pub account_type: AccountType,
     /// PassBook authority
-    pub creator: Pubkey,
+    pub authority: Pubkey,
+    /// PassBook state
+    pub state: PassBookState,
     /// Name
     pub name: String,
     /// Description
@@ -102,18 +100,14 @@ pub struct PassBook {
     pub uri: String,
     /// If true authority can make changes at deactivated phase
     pub mutable: bool,
-    /// PassBook state
-    pub state: PassBookState,
     /// The no of days this pass can be used to access the service
     pub access: Option<u64>,
     /// The no of minutes consumed for each use of this pass
-    pub duration: Option<u64>,
+    pub max_uses: Option<u64>,
     /// Total number of passes created
     pub supply: u64,
     /// Maximum number of passes that can be minted from this pass
     pub max_supply: Option<u64>,
-    /// blur hash of image
-    pub blur_hash: Option<String>,
     /// creation date
     pub created_at: u64,
     /// price
@@ -128,7 +122,7 @@ impl PassBook {
     /// Initialize a PackSet
     pub fn init(&mut self, params: InitPassBook) {
         self.account_type = AccountType::PassBook;
-        self.creator = params.creator;
+        self.authority = params.authority;
         self.description = params.description;
         self.uri = params.uri;
         self.name = params.name;
@@ -136,8 +130,7 @@ impl PassBook {
         self.mutable = params.mutable;
         self.state = PassBookState::NotActivated;
         self.access = params.access;
-        self.duration = params.duration;
-        self.blur_hash = params.blur_hash;
+        self.max_uses = params.max_uses;
         self.max_supply = params.max_supply;
         self.created_at = params.created_at;
         self.price = params.price;
@@ -158,7 +151,7 @@ impl PassBook {
         Ok(())
     }
 
-    /// Check if pas is in activated state
+    /// Check if pass is in activated state
     pub fn assert_activated(&self) -> Result<(), ProgramError> {
         if self.state != PassBookState::Activated {
             return Err(NFTPassError::PassNotActivated.into());
