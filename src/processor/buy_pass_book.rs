@@ -152,7 +152,10 @@ pub fn buy<'a>(
 
     membership.expires_at = expires_at;
     membership.passbook = Some(*pass_book_info.key);
-    membership.state = MembershipState::Activated;
+    if  membership.state != MembershipState::Activated {
+        membership.state = MembershipState::Activated;
+        pass_store.increment_active_membership_count()?;
+    }
     if let Some(max_uses) = passbook.max_uses {
         membership.uses = Some(Uses {
             remaining: 0,
@@ -173,6 +176,7 @@ pub fn buy<'a>(
     if is_new_membership {
         pass_store.increment_membership_count()?;
     }
+    pass_store.increment_pass_count()?;
     trade_history.increment_already_bought()?;
     passbook.increment_supply()?;
     PassBook::pack(passbook, *pass_book_info.data.borrow_mut())?;

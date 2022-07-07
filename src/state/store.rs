@@ -1,7 +1,7 @@
 //! Pass definitions
 
 use super::*;
-use crate::{math::SafeMath};
+use crate::math::SafeMath;
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     borsh::try_from_slice_unchecked,
@@ -14,8 +14,10 @@ use solana_program::{
 pub const MAX_STORE_LEN: usize = 1+
 32 // authority mint
 + 8 // total redeemed
-+ 8 // total edition
-+ 8 // total master edition
++ 8 // membership count
++ 8 // passes count
++ 8 // active membership
++ 8 // total pass books
 + 33 // store referrer
 + 9; // referral end
 
@@ -29,8 +31,12 @@ pub struct Store {
     pub authority: Pubkey,
     /// count of editions redeemed
     pub redemptions_count: u64,
-    /// count of editions printed
+    /// count of memberships created
     pub membership_count: u64,
+    /// count of active membership
+    pub active_membership_count: u64,
+    /// count of passes created
+    pub pass_count: u64,
     /// count of master edition passes belonging to this store
     pub pass_book_count: u64,
     /// referrer wallet
@@ -47,6 +53,8 @@ impl Store {
         self.authority = authority;
         self.redemptions_count = 0;
         self.membership_count = 0;
+        self.active_membership_count = 0;
+        self.pass_count = 0;
         self.pass_book_count = 0;
     }
 
@@ -62,6 +70,18 @@ impl Store {
         Ok(())
     }
 
+    /// Increment the total number of passes issued
+    pub fn increment_pass_count(&mut self) -> Result<(), ProgramError> {
+        self.pass_count = self.pass_count.error_increment()?;
+        Ok(())
+    }
+
+    /// Increment the total number of active membership issued
+    pub fn increment_active_membership_count(&mut self) -> Result<(), ProgramError> {
+        self.active_membership_count = self.active_membership_count.error_increment()?;
+        Ok(())
+    }
+
     /// Increment the total number of master edition passes
     pub fn increment_pass_book_count(&mut self) -> Result<(), ProgramError> {
         self.pass_book_count = self.pass_book_count.error_increment()?;
@@ -71,8 +91,7 @@ impl Store {
 
 impl IsInitialized for Store {
     fn is_initialized(&self) -> bool {
-        self.account_type != AccountType::Uninitialized
-            && self.account_type == AccountType::Store
+        self.account_type != AccountType::Uninitialized && self.account_type == AccountType::Store
     }
 }
 
@@ -100,14 +119,13 @@ impl Pack for Store {
     }
 }
 
-
 #[repr(C)]
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug, Clone, BorshSchema)]
 pub struct StoreAuthority {
     pub account_type: AccountType, //1
-    pub store: Pubkey, // 32
-    pub allowed_redemptions: u64, //8
-    pub bump: u8, //1
+    pub store: Pubkey,             // 32
+    pub allowed_redemptions: u64,  //8
+    pub bump: u8,                  //1
 }
 
 impl StoreAuthority {
@@ -119,7 +137,6 @@ impl StoreAuthority {
         self.bump = bump;
     }
 }
-
 
 impl IsInitialized for StoreAuthority {
     fn is_initialized(&self) -> bool {
@@ -141,7 +158,7 @@ impl Pack for StoreAuthority {
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
         if (src[0] != AccountType::StoreAuthority as u8
             && src[0] != AccountType::Uninitialized as u8)
-           || src.len() != Self::LEN
+            || src.len() != Self::LEN
         {
             msg!("Failed to deserialize");
             return Err(ProgramError::InvalidAccountData);
