@@ -9,7 +9,7 @@ use solana_program::{
     program::{invoke, invoke_signed},
     program_error::ProgramError,
     program_memory::sol_memcmp,
-    program_pack::IsInitialized,
+    program_pack::{IsInitialized, Pack},
     pubkey::{Pubkey, PUBKEY_BYTES},
     system_instruction,
     sysvar::{rent::Rent, Sysvar},
@@ -483,7 +483,6 @@ pub fn create_associated_token_account_raw<'a>(
     spl_token_program_info: &AccountInfo<'a>,
     rent_sysvar_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
-    signers_seeds: &[&[u8]],
 ) -> ProgramResult {
     invoke(
         &create_associated_token_account(payer_info.key, wallet_info.key, mint_info.key),
@@ -497,4 +496,16 @@ pub fn create_associated_token_account_raw<'a>(
             rent_sysvar_info.clone(),
         ],
     )
+}
+
+/// assert initialized account
+pub fn assert_initialized<T: Pack + IsInitialized>(
+    account_info: &AccountInfo,
+) -> Result<T, ProgramError> {
+    let account: T = T::unpack_unchecked(&account_info.data.borrow())?;
+    if !account.is_initialized() {
+        Err(NFTPassError::Uninitialized.into())
+    } else {
+        Ok(account)
+    }
 }

@@ -1,30 +1,35 @@
-mod edition;
-mod master_edition_v2;
-mod pass_book;
-mod metadata;
-mod user;
 mod assert;
-mod token;
+mod edition;
 mod edition_marker;
-mod trade_history;
-mod store;
+mod master_edition_v2;
+mod membership;
+mod metadata;
+mod pass_book;
 mod payout;
+mod store;
+mod token;
+mod trade_history;
+mod user;
 
-pub use master_edition_v2::TestMasterEditionV2;
-pub use pass_book::TestPassBook;
-pub use metadata::TestMetadata;
-pub use token::TestSplToken;
-pub use user::*;
-pub use edition_marker::TestEditionMarker;
-pub use trade_history::TestTradeHistory;
-pub use store::TestStore;
-pub use payout::TestPayout;
 pub use assert::*;
+pub use edition_marker::TestEditionMarker;
+pub use master_edition_v2::TestMasterEditionV2;
+pub use membership::TestMembership;
+pub use metadata::TestMetadata;
+pub use pass_book::TestPassBook;
+pub use payout::TestPayout;
+pub use store::TestStore;
+pub use token::TestSplToken;
+pub use trade_history::TestTradeHistory;
+pub use user::*;
 
 use solana_program_test::*;
 use solana_sdk::{
     account::Account, program_pack::Pack, pubkey::Pubkey, signature::Signer,
     signer::keypair::Keypair, system_instruction, transaction::Transaction,
+};
+use nft_pass_book::{
+    instruction,
 };
 use spl_token::state::Mint;
 
@@ -194,4 +199,113 @@ pub async fn create_mint(
     );
 
     context.banks_client.process_transaction(tx).await
+}
+
+pub async fn set_up_pass_book_data(
+    user: &User,
+    buyer: &User,
+    amount: u64,
+    is_native: bool,
+) -> (
+    ProgramTestContext,
+    TestPassBook,
+    TestStore,
+    TestTradeHistory,
+    TestSplToken,
+    TestMembership,
+) {
+    let mut context = nft_pass_book_program_test().start_with_context().await;
+    let test_pass = TestPassBook::new();
+    let test_store = TestStore::new(&user.pubkey());
+    let trade_history = TestTradeHistory::new(&test_pass.account.pubkey(), &buyer.pubkey());
+    let membership = TestMembership::new(&test_store.pubkey, &buyer.pubkey());
+    let token = TestSplToken::new(is_native);
+    if is_native {
+        token
+            .airdrop(&mut context, amount, &buyer.pubkey())
+            .await
+            .unwrap()
+    } else {
+        token
+            .create(
+                &mut context,
+                1_000_000_000_000,
+                &user.token_account,
+                &&user.pubkey(),
+            )
+            .await
+            .unwrap();
+        token
+            .mint_to(&mut context, amount, &buyer.token_account, &buyer.pubkey())
+            .await
+            .unwrap();
+    }
+    (
+        context,
+        test_pass,
+        test_store,
+        trade_history,
+        token,
+        membership,
+    )
+}
+
+pub fn setup_users() -> (User, User, User, User) {
+    let user = User {
+        owner: Keypair::new(),
+        token_account: Keypair::new(),
+    };
+    let referrer = User {
+        owner: Keypair::new(),
+        token_account: Keypair::new(),
+    };
+    let market_authority = User {
+        owner: Keypair::new(),
+        token_account: Keypair::new(),
+    };
+    let buyer = User {
+        owner: Keypair::new(),
+        token_account: Keypair::new(),
+    };
+    return (user, referrer, market_authority, buyer);
+}
+
+pub async fn setup_pass_book(mutable: bool) -> (ProgramTestContext, TestPassBook, User) {
+    let (user, referrer, market, buyer) = setup_users();
+    let (mut context, test_pass, test_store, _, token, _) =
+    set_up_pass_book_data(&user, &buyer, 10_000_000, false).await;
+    let market_place_user = Some(&market);
+    let referrer = Some(&referrer);
+
+    let name = String::from("Pass Name");
+    let uri = String::from("some link to storage");
+    let description = String::from("Pack description");
+
+    test_pass
+        .init(
+            &mut context,
+            &user,
+            &test_store.pubkey,
+            &token.pubkey(),
+            market_place_user,
+            referrer,
+            instruction::InitPassBookArgs {
+                name: name.clone(),
+                uri: uri.clone(),
+                description: description.clone(),
+                mutable: mutable,
+                duration: Some(30), //30 mins duration per session
+                access: Some(30),   //valid for 30 days
+                max_supply: Some(5),
+                blur_hash: None,
+                price: 10_000_000,
+                has_referrer: referrer.is_some(), // Some(referrer.pubkey()),
+                has_market_authority: market_place_user.is_some(),
+                referral_end_date: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    (context, test_pass, user)
 }

@@ -21,8 +21,8 @@ pub enum NFTPassError {
     CantSetTheSameValue,
 
     /// Invalid Authority
-    #[error("InvalidAuthorityKey")]
-    InvalidAuthorityKey,
+    #[error("InvalidCreatorKey")]
+    InvalidCreatorKey,
 
     /// Invalid Mint Key
     #[error("InvalidMintKey")]
@@ -175,6 +175,18 @@ pub enum NFTPassError {
     /// InvalidTokenAccount
     #[error("InvalidTokenAccount")]
     InvalidTokenAccount,
+
+    /// Uninitialized
+    #[error("Uninitialized")]
+    Uninitialized,
+
+    /// Invalid Membership Key
+    #[error("InvalidMembershipKey")]
+    InvalidMembershipKey,
+
+    /// User has active membership
+    #[error("UserHasActiveMembership")]
+    UserHasActiveMembership,
 }
 
 impl From<NFTPassError> for ProgramError {

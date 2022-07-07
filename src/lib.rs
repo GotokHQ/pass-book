@@ -16,7 +16,7 @@ pub mod entrypoint;
 // Export current sdk types for downstream users building with a different sdk version
 pub use solana_program;
 use solana_program::pubkey::Pubkey;
-use state::{PassStore, COLLECTION_MINT, PREFIX, Payout, TradeHistory};
+use state::{PassStore, COLLECTION_MINT, PREFIX, Payout, TradeHistory, Membership};
 
 
 solana_program::declare_id!("passjvPvHQWN4SvBCmHk1gdrtBvoHRERtQK9MKemreQ");
@@ -92,11 +92,16 @@ pub fn find_pass_book_program_address(program_id: &Pubkey, mint: &Pubkey) -> (Pu
     )
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
+/// Generate membership pda
+pub fn find_membership_program_address(program_id: &Pubkey, store: &Pubkey, wallet: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            PREFIX.as_bytes(),
+            program_id.as_ref(),
+            &store.to_bytes(),
+            &wallet.to_bytes(),
+            Membership::PREFIX.as_bytes(),
+        ],
+        program_id,
+    )
 }

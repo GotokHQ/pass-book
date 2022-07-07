@@ -27,8 +27,8 @@ pub fn deactivate_pass_book(program_id: &Pubkey, accounts: &[AccountInfo]) -> Pr
 
     assert_account_key(
         authority_account,
-        &pass_book.authority,
-        Some(NFTPassError::InvalidAuthorityKey),
+        &pass_book.creator,
+        Some(NFTPassError::InvalidCreatorKey),
     )?;
 
     if pass_book.state == PassBookState::Deactivated {

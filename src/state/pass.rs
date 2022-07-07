@@ -25,8 +25,7 @@ pub const MAX_PASS_LEN: usize =
 + 32 // mint
 + 32 // collection pub key
 + 65 // expires
-+ 1  // pass state
-+ 192; // Padding
++ 1;  // pass state
 
 
 /// Pack state
@@ -54,8 +53,8 @@ pub struct InitPassParams {
     pub description: String,
     /// URI
     pub uri: String,
-    /// mint
-    pub mint: Pubkey,
+    /// owner
+    pub owner: Pubkey,
     /// Pass book this bass belongs to
     pub pass_book: Pubkey, 
     /// pass expiration in unix timestamp
@@ -69,8 +68,8 @@ pub struct InitPassParams {
 pub struct Pass {
     /// Account type - Pass
     pub account_type: AccountType,
-    /// mint
-    pub mint: Pubkey,
+    /// owner
+    pub owner: Pubkey,
     /// Pass book
     pub pass_book: Pubkey,
     /// Description
@@ -92,7 +91,7 @@ impl Pass {
     pub fn init(&mut self, params: InitPassParams) {
         self.account_type = AccountType::Pass;
         self.pass_book = params.pass_book;
-        self.mint = params.mint;
+        self.owner = params.owner;
         self.description = params.description;
         self.uri = params.uri;
         self.name = params.name;

@@ -7,12 +7,14 @@ mod store;
 mod pass_book;
 mod payout;
 mod trade_history;
+mod membership;
 
 pub use pass::*;
 pub use store::*;
 pub use pass_book::*;
 pub use payout::*;
 pub use trade_history::*;
+pub use membership::*;
 
 
 /// Global prefix for program addresses
@@ -49,8 +51,8 @@ pub enum AccountType {
     Payout,
     /// TradeHistory
     TradeHistory,
-    /// Payout
-    PayoutTicket
+    /// Membership
+    Membership
 }
 
 impl Default for AccountType {

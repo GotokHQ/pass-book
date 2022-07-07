@@ -7,7 +7,6 @@ use crate::{
     math::SafeMath
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use mpl_token_metadata::state::{MAX_CREATOR_LIMIT};
 use solana_program::{
     borsh::try_from_slice_unchecked,
     msg,
@@ -24,7 +23,6 @@ pub const MAX_PASS_BOOK_LEN: usize = 1 //account type
 +4
 + MAX_URI_LENGTH //uri
 + 32 // authority pub key
-+ 32 // mint pub key
 + 1 // mutable
 + 1 // state
 + 9 // access
@@ -33,12 +31,10 @@ pub const MAX_PASS_BOOK_LEN: usize = 1 //account type
 + 1 + 4 + MAX_LENGTH_IMAGE_HASH //image blur hash
 + 8 // created_at
 + 8 // price
-+ 32 // price_mint
-+ 32 // token
++ 32 // mint
 + 33 // market authority
 + 1
 + 4
-+ MAX_CREATOR_LIMIT * 32
 + 85;
 
 
@@ -68,10 +64,8 @@ pub struct InitPassBook {
     pub description: String,
     /// URI
     pub uri: String,
-    /// PassBook authority
-    pub authority: Pubkey,
-    /// PassBook mint
-    pub mint: Pubkey,
+    /// PassBook creator
+    pub creator: Pubkey,
     /// If true authority can make changes at deactivated phase
     pub mutable: bool,
     /// The no of days this pass can be used to access the service
@@ -87,15 +81,9 @@ pub struct InitPassBook {
     /// price
     pub price: u64,
     /// treasury mint
-    pub price_mint: Pubkey,
-    /// token
-    pub token: Pubkey,
+    pub mint: Pubkey,
     /// market authority
     pub market_authority: Option<Pubkey>, 
-    /// cached creators
-    pub creators: Option<Vec<Pubkey>>,
-    /// The maximum number of passes a user can have in wallet
-    pub pieces_in_one_wallet: Option<u64>,
 }
 
 /// Pack set
@@ -105,9 +93,7 @@ pub struct PassBook {
     /// Account type - PassBook
     pub account_type: AccountType,
     /// PassBook authority
-    pub authority: Pubkey,
-    /// PassBook mint
-    pub mint: Pubkey,
+    pub creator: Pubkey,
     /// Name
     pub name: String,
     /// Description
@@ -133,22 +119,16 @@ pub struct PassBook {
     /// price
     pub price: u64,
     /// price mint
-    pub price_mint: Pubkey,
-    /// token
-    pub token: Pubkey,
+    pub mint: Pubkey,
     /// market_authority that must sign the transaction to buy or mint
     pub market_authority: Option<Pubkey>,
-    /// cached creators
-    pub creators: Option<Vec<Pubkey>>,
-    /// The maximum number of passes a user can have in wallet
-    pub pieces_in_one_wallet: Option<u64>,
 }
 
 impl PassBook {
     /// Initialize a PackSet
     pub fn init(&mut self, params: InitPassBook) {
         self.account_type = AccountType::PassBook;
-        self.authority = params.authority;
+        self.creator = params.creator;
         self.description = params.description;
         self.uri = params.uri;
         self.name = params.name;
@@ -161,11 +141,7 @@ impl PassBook {
         self.max_supply = params.max_supply;
         self.created_at = params.created_at;
         self.price = params.price;
-        self.price_mint = params.price_mint;
-        self.token = params.token;
         self.market_authority = params.market_authority;
-        self.creators = params.creators;
-        self.pieces_in_one_wallet = params.pieces_in_one_wallet;
     }
 
     /// Increment total passes

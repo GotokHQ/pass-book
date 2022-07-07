@@ -1,12 +1,13 @@
 use crate::*;
-use mpl_token_metadata::state::Metadata;
 use nft_pass_book::{
-    find_pass_book_program_address, find_payout_program_address,
+    find_payout_program_address,
     instruction::{self, EditPassBookArgs},
     state::{PassBook, PassStore, PayoutInfoArgs},
     utils::cmp_pubkeys,
 };
-use solana_program::{instruction::Instruction, program_pack::Pack, pubkey::Pubkey};
+use solana_program::{
+    instruction::Instruction, program_pack::Pack, pubkey::Pubkey, system_instruction,
+};
 use solana_program_test::*;
 
 use solana_sdk::{signer::Signer, transaction::Transaction};
@@ -15,17 +16,14 @@ use spl_associated_token_account::{
 };
 #[derive(Debug)]
 pub struct TestPassBook {
-    pub pubkey: Pubkey,
-    pub token_account: Pubkey,
+    pub account: Keypair,
 }
 
 impl TestPassBook {
     #[allow(clippy::new_without_default)]
-    pub fn new(mint: Pubkey) -> Self {
-        let (pubkey, _) = find_pass_book_program_address(&nft_pass_book::id(), &mint);
+    pub fn new() -> Self {
         Self {
-            pubkey,
-            token_account: get_associated_token_address(&pubkey, &mint),
+            account: Keypair::new(),
         }
     }
 
@@ -37,7 +35,7 @@ impl TestPassBook {
         let tx = Transaction::new_signed_with_payer(
             &[instruction::activate_pass_book(
                 &nft_pass_book::id(),
-                &self.pubkey,
+                &self.account.pubkey(),
                 &user.owner.pubkey(),
             )],
             Some(&context.payer.pubkey()),
@@ -56,7 +54,7 @@ impl TestPassBook {
         let tx = Transaction::new_signed_with_payer(
             &[instruction::deactivate_pass_book(
                 &nft_pass_book::id(),
-                &self.pubkey,
+                &self.account.pubkey(),
                 &user.owner.pubkey(),
             )],
             Some(&context.payer.pubkey()),
@@ -68,7 +66,7 @@ impl TestPassBook {
     }
 
     pub async fn get_data(&self, context: &mut ProgramTestContext) -> PassBook {
-        let account = get_account(context, &self.pubkey).await;
+        let account = get_account(context, &self.account.pubkey()).await;
         PassBook::unpack_unchecked(&account.data).unwrap()
     }
 
@@ -82,14 +80,14 @@ impl TestPassBook {
         uri: Option<String>,
         price: Option<u64>,
         blur_hash: Option<String>,
-        price_mint: Option<&Pubkey>,
+        mint: Option<&Pubkey>,
     ) -> Result<(), BanksClientError> {
         let tx = Transaction::new_signed_with_payer(
             &[instruction::edit_pass_book(
                 &nft_pass_book::id(),
-                &self.pubkey,
+                &self.account.pubkey(),
                 &user.owner.pubkey(),
-                price_mint,
+                mint,
                 EditPassBookArgs {
                     name,
                     description,
@@ -112,18 +110,13 @@ impl TestPassBook {
         context: &mut ProgramTestContext,
         user: &User,
         refunder: &Pubkey,
-        mint: &Pubkey,
-        new_master_edition_owner_token_acc: Option<&Pubkey>,
     ) -> Result<(), BanksClientError> {
         let tx = Transaction::new_signed_with_payer(
             &[instruction::delete_pass_book(
                 &nft_pass_book::id(),
-                &self.pubkey,
-                &user.owner.pubkey(),
-                refunder,
-                &self.token_account,
-                mint,
-                new_master_edition_owner_token_acc,
+                &self.account.pubkey(),
+                &user.pubkey(),
+                &refunder,
             )],
             Some(&context.payer.pubkey()),
             &[&user.owner, &context.payer],
@@ -136,66 +129,46 @@ impl TestPassBook {
     pub async fn init(
         &self,
         context: &mut ProgramTestContext,
-        test_master_edition: &TestMasterEditionV2,
-        test_metadata: &TestMetadata,
         user: &User,
         store: &Pubkey,
-        price_mint: &Pubkey,
+        mint: &Pubkey,
         market: Option<&User>,
         referrer: Option<&User>,
         args: instruction::InitPassBookArgs,
     ) -> Result<(), BanksClientError> {
-        let metadata: Metadata = test_metadata.get_data(context).await;
         let mut instructions: Vec<Instruction> = vec![];
-        let mut signers = vec![&context.payer, &user.owner];
-        let is_native = cmp_pubkeys(price_mint, &spl_token::native_mint::id());
-        let creator_payout = if let Some(creators) = metadata.data.creators {
-            creators
-                .iter()
-                .map(|creator| {
-                    let creator_payout = find_payout_program_address(
-                        &nft_pass_book::id(),
-                        &creator.address,
-                        price_mint,
-                    )
-                    .0;
-                    let token_account = if is_native {
-                        creator_payout
-                    } else {
-                        instructions.push(create_associated_token_account(
-                            &context.payer.pubkey(),
-                            &creator_payout,
-                            price_mint,
-                        ));
-                        get_associated_token_address(&creator_payout, price_mint)
-                    };
-                    PayoutInfoArgs {
-                        authority: creator.address,
-                        payout_account: creator_payout,
-                        token_account: token_account,
-                    }
-                })
-                .collect()
+        let mut signers = vec![&context.payer, &user.owner, &self.account];
+        let is_native = cmp_pubkeys(mint, &spl_token::native_mint::id());
+        let creator_payout_key =
+            find_payout_program_address(&nft_pass_book::id(), &user.pubkey(), mint).0;
+        let creator_token_account = if is_native {
+            creator_payout_key
         } else {
-            vec![]
+            instructions.push(create_associated_token_account(
+                &context.payer.pubkey(),
+                &creator_payout_key,
+                mint,
+            ));
+            get_associated_token_address(&creator_payout_key, mint)
+        };
+        let creator_payout = PayoutInfoArgs {
+            authority: user.pubkey(),
+            payout_account: creator_payout_key,
+            token_account: creator_token_account,
         };
         let market_authority = if let Some(market_info) = market {
             signers.push(&market_info.owner);
-            let payout = find_payout_program_address(
-                &nft_pass_book::id(),
-                &market_info.pubkey(),
-                price_mint,
-            )
-            .0;
+            let payout =
+                find_payout_program_address(&nft_pass_book::id(), &market_info.pubkey(), mint).0;
             let token_account = if is_native {
                 payout
             } else {
                 instructions.push(create_associated_token_account(
                     &context.payer.pubkey(),
                     &payout,
-                    price_mint,
+                    mint,
                 ));
-                get_associated_token_address(&payout, price_mint)
+                get_associated_token_address(&payout, mint)
             };
             let market_auth = PayoutInfoArgs {
                 authority: market_info.pubkey(),
@@ -208,21 +181,17 @@ impl TestPassBook {
         };
 
         let referrer = if let Some(referrer_user) = referrer {
-            let payout = find_payout_program_address(
-                &nft_pass_book::id(),
-                &referrer_user.pubkey(),
-                price_mint,
-            )
-            .0;
+            let payout =
+                find_payout_program_address(&nft_pass_book::id(), &referrer_user.pubkey(), mint).0;
             let token_account = if is_native {
                 payout
             } else {
                 instructions.push(create_associated_token_account(
                     &context.payer.pubkey(),
                     &payout,
-                    price_mint,
+                    mint,
                 ));
-                get_associated_token_address(&payout, price_mint)
+                get_associated_token_address(&payout, mint)
             };
             let referrer = PayoutInfoArgs {
                 authority: referrer_user.pubkey(),
@@ -233,27 +202,25 @@ impl TestPassBook {
         } else {
             None
         };
-        instructions.push(create_associated_token_account(
+        let rent = context.banks_client.get_rent().await?;
+        instructions.push(system_instruction::create_account(
             &context.payer.pubkey(),
-            &self.pubkey,
-            &test_metadata.mint.pubkey(),
+            &self.account.pubkey(),
+            rent.minimum_balance(PassBook::LEN),
+            PassBook::LEN as u64,
+            &nft_pass_book::id(),
         ));
         instructions.push(instruction::init_pass_book(
             &nft_pass_book::id(),
-            &self.pubkey,
-            &test_metadata.token.pubkey(),
-            &self.token_account,
+            &self.account.pubkey(),
             store,
-            &user.owner.pubkey(),
+            &user.pubkey(),
             &context.payer.pubkey(),
-            &test_master_edition.mint_pubkey,
-            &test_metadata.pubkey,
-            &test_master_edition.pubkey,
-            price_mint,
+            mint,
+            &creator_payout,
             market_authority.as_ref(),
             referrer.as_ref(),
             args.clone(),
-            &creator_payout,
         ));
         let tx = Transaction::new_signed_with_payer(
             &instructions,
@@ -267,56 +234,41 @@ impl TestPassBook {
     pub async fn buy(
         &self,
         context: &mut ProgramTestContext,
-        metadata: &TestMetadata,
-        edition_marker: &TestEditionMarker,
         store: &TestStore,
-        user: &User,
+        buyer: &User,
+        membership: &TestMembership,
         market: Option<&User>,
         trade_history: &TestTradeHistory,
         args: instruction::BuyPassArgs,
     ) -> Result<(), BanksClientError> {
-        let metadata: Metadata = metadata.get_data(context).await;
         let passbook: PassBook = self.get_data(context).await;
         let pass_store: PassStore = store.get_data(context).await;
-        let mut signers = vec![&context.payer, &user.owner];
-        let is_native = cmp_pubkeys(&passbook.price_mint, &spl_token::native_mint::id());
-        let creator_payout = if let Some(creators) = metadata.data.creators {
-            creators
-                .iter()
-                .map(|creator| {
-                    let creator_payout = find_payout_program_address(
-                        &nft_pass_book::id(),
-                        &creator.address,
-                        &passbook.price_mint,
-                    )
-                    .0;
-                    let token_account = if is_native {
-                        creator_payout
-                    } else {
-                        get_associated_token_address(&creator_payout, &passbook.price_mint)
-                    };
-                    PayoutInfoArgs {
-                        authority: creator.address,
-                        payout_account: creator_payout,
-                        token_account: token_account,
-                    }
-                })
-                .collect()
+        let mut signers = vec![&context.payer, &buyer.owner];
+        let is_native = cmp_pubkeys(&passbook.mint, &spl_token::native_mint::id());
+        let creator_payout_key =
+            find_payout_program_address(&nft_pass_book::id(), &passbook.creator, &passbook.mint).0;
+        let token_account = if is_native {
+            creator_payout_key
         } else {
-            vec![]
+            get_associated_token_address(&creator_payout_key, &passbook.mint)
+        };
+        let creator_payout = PayoutInfoArgs {
+            authority: passbook.creator,
+            payout_account: creator_payout_key,
+            token_account: token_account,
         };
         let market_authority = if let Some(market_info) = market {
             signers.push(&market_info.owner);
             let payout = find_payout_program_address(
                 &nft_pass_book::id(),
                 &market_info.pubkey(),
-                &passbook.price_mint,
+                &passbook.mint,
             )
             .0;
             let token_account = if is_native {
                 payout
             } else {
-                get_associated_token_address(&payout, &passbook.price_mint)
+                get_associated_token_address(&payout, &passbook.mint)
             };
             let market_auth = PayoutInfoArgs {
                 authority: market_info.pubkey(),
@@ -329,16 +281,12 @@ impl TestPassBook {
         };
 
         let referrer = if let Some(referrer_user) = pass_store.referrer {
-            let payout = find_payout_program_address(
-                &nft_pass_book::id(),
-                &referrer_user,
-                &passbook.price_mint,
-            )
-            .0;
+            let payout =
+                find_payout_program_address(&nft_pass_book::id(), &referrer_user, &passbook.mint).0;
             let token_account = if is_native {
                 payout
             } else {
-                get_associated_token_address(&payout, &passbook.price_mint)
+                get_associated_token_address(&payout, &passbook.mint)
             };
             let referrer = PayoutInfoArgs {
                 authority: referrer_user,
@@ -350,27 +298,26 @@ impl TestPassBook {
             None
         };
 
+        let buyer_token = if is_native {
+            buyer.pubkey()
+        } else {
+            buyer.token_account.pubkey()
+        };
+        println!("START PROCESSING BUY INSTRUCTION");
         let tx = Transaction::new_signed_with_payer(
             &[instruction::buy_pass(
                 &nft_pass_book::id(),
-                &self.pubkey,
+                &self.account.pubkey(),
                 &store.pubkey,
-                &self.token_account,
-                &user.owner.pubkey(),
-                &user.token_account.pubkey(),
+                &buyer.pubkey(),
+                &buyer_token,
                 &context.payer.pubkey(),
-                &edition_marker.new_metadata_pubkey,
-                &edition_marker.new_edition_pubkey,
-                &edition_marker.mint.pubkey(),
-                &edition_marker.metadata_pubkey,
-                &edition_marker.master_edition_pubkey,
-                &edition_marker.pubkey,
-                &edition_marker.token.pubkey(),
                 &trade_history.pubkey,
+                &membership.pubkey,
                 market_authority.as_ref(),
                 referrer.as_ref(),
-                args.clone(),
                 &creator_payout,
+                args.clone(),
             )],
             Some(&context.payer.pubkey()),
             &signers,

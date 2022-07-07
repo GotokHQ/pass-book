@@ -2,10 +2,10 @@
 
 use crate::{
     error::NFTPassError,
-    find_pass_book_program_address, find_pass_store_program_address,
+    find_membership_program_address, find_pass_store_program_address,
     find_trade_history_program_address, id,
     instruction::BuyPassArgs,
-    state::{PassBook, PassStore, Payout, TradeHistory, PREFIX},
+    state::{Membership, MembershipState, PassBook, PassStore, Payout, TradeHistory, PREFIX},
     utils::*,
 };
 
@@ -17,11 +17,6 @@ use solana_program::{
     program_pack::Pack,
     pubkey::Pubkey,
     sysvar::{clock::Clock, Sysvar},
-};
-
-use mpl_token_metadata::{
-    state::Metadata,
-    utils::{assert_initialized, get_supply_off_master_edition},
 };
 
 use std::slice::Iter;
@@ -37,55 +32,29 @@ pub fn buy<'a>(
     let account_info_iter = &mut accounts.iter();
     let pass_book_info = next_account_info(account_info_iter)?;
     let store_info = next_account_info(account_info_iter)?;
-    let vault_token_account_info = next_account_info(account_info_iter)?;
     let user_wallet_info = next_account_info(account_info_iter)?;
     let user_token_account_info = next_account_info(account_info_iter)?;
     let payer_account_info = next_account_info(account_info_iter)?;
-    let new_metadata_info = next_account_info(account_info_iter)?;
-    let new_edition_info = next_account_info(account_info_iter)?;
-    let new_mint_info = next_account_info(account_info_iter)?;
-    let master_metadata_info = next_account_info(account_info_iter)?;
-    let master_edition_info = next_account_info(account_info_iter)?;
-    let edition_marker_info = next_account_info(account_info_iter)?;
-    let new_token_account_info = next_account_info(account_info_iter)?;
-
     let trade_history_info = next_account_info(account_info_iter)?;
+    let membership_info = next_account_info(account_info_iter)?;
 
     let clock_info = next_account_info(account_info_iter)?;
     let rent_info = next_account_info(account_info_iter)?;
     let system_account_info = next_account_info(account_info_iter)?;
-    let token_program_info = next_account_info(account_info_iter)?;
     let clock = &Clock::from_account_info(clock_info)?;
 
     assert_owned_by(pass_book_info, &id())?;
     assert_owned_by(store_info, &id())?;
-    assert_owned_by(vault_token_account_info, &spl_token::id())?;
-
     assert_signer(user_wallet_info)?;
-
-    assert_owned_by(new_mint_info, &spl_token::id())?;
-    assert_owned_by(master_metadata_info, &mpl_token_metadata::id())?;
-    assert_owned_by(master_edition_info, &mpl_token_metadata::id())?;
-
-    assert_owned_by(new_token_account_info, &spl_token::id())?;
 
     let mut passbook = PassBook::unpack(&pass_book_info.data.borrow_mut())?;
 
     let mut pass_store = PassStore::unpack(&store_info.data.borrow_mut())?;
 
-    let (store_key, _) = find_pass_store_program_address(program_id, &passbook.authority);
+    let (store_key, _) = find_pass_store_program_address(program_id, &passbook.creator);
     assert_account_key(store_info, &store_key, Some(NFTPassError::InvalidStoreKey))?;
-    assert_account_key(
-        vault_token_account_info,
-        &passbook.token,
-        Some(NFTPassError::InvalidVaultToken),
-    )?;
-    let master_metadata = Metadata::from_account_info(master_metadata_info)?;
-    if master_metadata.mint != passbook.mint {
-        return Err(NFTPassError::InvalidMintKey.into());
-    }
 
-    let is_native = cmp_pubkeys(&passbook.price_mint, &spl_token::native_mint::id());
+    let is_native = cmp_pubkeys(&passbook.mint, &spl_token::native_mint::id());
 
     if is_native {
         assert_account_key(
@@ -95,57 +64,13 @@ pub fn buy<'a>(
         )?;
     } else {
         let user_token_account: Account = assert_initialized(user_token_account_info)?;
-        if user_token_account.mint != passbook.price_mint {
+        if user_token_account.mint != passbook.mint {
             return Err(NFTPassError::PriceTokenMismatch.into());
         }
         if user_token_account.owner != *user_wallet_info.key {
-            msg!("USER TOKEN OWNER DOES NOT MATCH WALLET OWNER ----------------->");
             return Err(ProgramError::IllegalOwner);
         }
     }
-
-    let edition = get_supply_off_master_edition(&master_edition_info)?
-        .checked_add(1)
-        .ok_or(NFTPassError::MathOverflow)?;
-
-    let (_, pass_book_bump_seed) = find_pass_book_program_address(program_id, &passbook.mint);
-
-    let pass_book_signer_seeds = &[
-        PREFIX.as_bytes(),
-        program_id.as_ref(),
-        &passbook.mint.to_bytes(),
-        &[pass_book_bump_seed],
-    ];
-
-    mpl_mint_new_edition_from_master_edition_via_token(
-        &new_metadata_info,
-        &new_edition_info,
-        &new_mint_info,
-        &payer_account_info,
-        &payer_account_info,
-        user_wallet_info,
-        &pass_book_info,
-        &vault_token_account_info,
-        &master_metadata_info,
-        &master_edition_info,
-        &master_metadata.mint,
-        &edition_marker_info,
-        &token_program_info,
-        &system_account_info,
-        &rent_info,
-        edition,
-        pass_book_signer_seeds,
-    )?;
-    let new_token_account: Account = assert_initialized(new_token_account_info)?;
-    if new_token_account.owner != *user_wallet_info.key {
-        return Err(ProgramError::IllegalOwner);
-    }
-
-    mpl_update_primary_sale_happened_via_token(
-        &new_metadata_info,
-        &user_wallet_info,
-        &new_token_account_info,
-    )?;
 
     let (trade_history_key, trade_history_bump_seed) =
         find_trade_history_program_address(program_id, pass_book_info.key, user_wallet_info.key);
@@ -177,17 +102,70 @@ pub fn buy<'a>(
 
     // Check, that user not reach buy limit
     // todo, add to passbook
-    if let Some(pieces_in_one_wallet) = passbook.pieces_in_one_wallet {
-        if trade_history.already_bought == pieces_in_one_wallet {
-            return Err(NFTPassError::UserReachBuyLimit.into());
-        }
+    // if let Some(pieces_in_one_wallet) = passbook.pieces_in_one_wallet {
+    //     if trade_history.already_bought == pieces_in_one_wallet {
+    //         return Err(NFTPassError::UserReachBuyLimit.into());
+    //     }
+    // }
+
+    let (membership_key, membership_bump_seed) =
+        find_membership_program_address(program_id, &store_key, user_wallet_info.key);
+    assert_account_key(
+        membership_info,
+        &membership_key,
+        Some(NFTPassError::InvalidMembershipKey),
+    )?;
+
+    let membership_signer_seeds = &[
+        PREFIX.as_bytes(),
+        program_id.as_ref(),
+        &store_key.to_bytes(),
+        &user_wallet_info.key.to_bytes(),
+        Membership::PREFIX.as_bytes(),
+        &[membership_bump_seed],
+    ];
+
+    let expires_at = if let Some(access) = passbook.access {
+        let time = access
+            .checked_mul(86400)
+            .ok_or(NFTPassError::MathOverflow)?
+            .checked_add(clock.unix_timestamp as u64)
+            .ok_or(NFTPassError::MathOverflow)?;
+        Some(time)
+    } else {
+        None
+    };
+
+    let mut membership = get_or_create_membership(
+        program_id,
+        membership_info,
+        user_wallet_info,
+        store_info,
+        payer_account_info,
+        rent_info,
+        system_account_info,
+        membership_signer_seeds,
+    )?;
+
+    let membership_expired = if let Some(expires_at) = membership.expires_at {
+        clock.unix_timestamp as u64 > expires_at
+    } else {
+        false
+    };
+
+    if !membership_expired && membership.state == MembershipState::Activated {
+        // cant buy a pass at this state
+        return Err(NFTPassError::UserHasActiveMembership.into());
     }
+
+    membership.expires_at = expires_at;
+    membership.passbook = Some(*pass_book_info.key);
+    membership.state = MembershipState::Activated;
 
     distribute_payout(
         args.market_fee_basis_point as u64,
         args.referral_share as u64,
         args.referral_kick_back_share as u64,
-        &master_metadata,
         &passbook,
         &pass_store,
         user_wallet_info.clone(),
@@ -202,6 +180,7 @@ pub fn buy<'a>(
     PassBook::pack(passbook, *pass_book_info.data.borrow_mut())?;
     PassStore::pack(pass_store, *store_info.data.borrow_mut())?;
     TradeHistory::pack(trade_history, *trade_history_info.data.borrow_mut())?;
+    Membership::pack(membership, *membership_info.data.borrow_mut())?;
     Ok(())
 }
 
@@ -240,10 +219,10 @@ pub fn pay_account<'a>(
     payout_token_account: &AccountInfo<'a>,
 ) -> Result<(), ProgramError> {
     let mut payout = Payout::unpack(&payout_account.data.borrow_mut())?;
-    if *authority != payout.authority && passbook.price_mint != payout.mint {
+    if *authority != payout.authority && passbook.mint != payout.mint {
         return Err(NFTPassError::InvalidPayoutKey.into());
     }
-    let is_native = cmp_pubkeys(&passbook.price_mint, &spl_token::native_mint::id());
+    let is_native = cmp_pubkeys(&passbook.mint, &spl_token::native_mint::id());
     if is_native {
         if payout_token_account.key != payout_account.key {
             return Err(ProgramError::InvalidAccountData);
@@ -251,11 +230,10 @@ pub fn pay_account<'a>(
     } else {
         assert_owned_by(payout_token_account, &spl_token::id())?;
         let token_account: Account = assert_initialized(payout_token_account)?;
-        if token_account.mint != passbook.price_mint {
+        if token_account.mint != passbook.mint {
             return Err(NFTPassError::PriceTokenMismatch.into());
         }
         if token_account.owner != *payout_account.key {
-            msg!("PAYOUT TOKEN OWNER DOES NOT MATCH PAYOUT ACCOUNT ----------------->");
             return Err(ProgramError::IllegalOwner);
         }
     }
@@ -278,7 +256,6 @@ pub fn distribute_payout<'a>(
     market_fee_basis_point: u64,
     referral_share: u64,
     referral_kick_back: u64,
-    metadata: &Metadata,
     passbook: &PassBook,
     store: &PassStore,
     user_wallet: AccountInfo<'a>,
@@ -293,25 +270,18 @@ pub fn distribute_payout<'a>(
         return Err(NFTPassError::WrongReferralShare.into());
     }
     let amount_for_creators = calculate_shares_less_points(passbook.price, market_fee_basis_point)?;
-    let mut creator_payout: Vec<PayoutInfo> = vec![];
-
-    if let Some(creators) = &metadata.data.creators {
-        for creator in creators {
-            let payout_info = next_account_info(remaining_accounts)?;
-            let payout_token_info = next_account_info(remaining_accounts)?;
-            creator_payout.push(PayoutInfo {
-                authority: creator.address,
-                payout_account: payout_info,
-                token_account: payout_token_info,
-                share: creator.share,
-            })
-        }
-    }
+    let creator_payout_info = next_account_info(remaining_accounts)?;
+    let creator_payout_token_info = next_account_info(remaining_accounts)?;
+    let creator_payout = PayoutInfo {
+        authority: passbook.creator,
+        payout_account: creator_payout_info,
+        token_account: creator_payout_token_info,
+        share: 100,
+    };
 
     distribute_payout_for_creators(
         amount_for_creators,
         passbook,
-        metadata,
         &user_wallet,
         &user_token_account,
         &creator_payout,
@@ -381,34 +351,23 @@ pub fn distribute_payout<'a>(
 pub fn distribute_payout_for_creators<'a>(
     amount: u64,
     passbook: &PassBook,
-    metadata: &Metadata,
     user_wallet: &AccountInfo<'a>,
     user_token_account: &AccountInfo<'a>,
-    payout_accounts: &[PayoutInfo<'a>],
+    payout_account: &PayoutInfo<'a>,
 ) -> Result<(), ProgramError> {
     if amount == 0 {
         return Ok(());
     }
-    for creator in payout_accounts {
-        let creator_amount = if metadata.primary_sale_happened {
-            calculate_user_shares_by_points(
-                amount,
-                metadata.data.seller_fee_basis_points as u64,
-                creator.share as u64,
-            )?
-        } else {
-            calculate_shares(amount, creator.share as u64)?
-        };
-        pay_account(
-            creator_amount,
-            &creator.authority,
-            passbook,
-            user_wallet,
-            user_token_account,
-            creator.payout_account,
-            creator.token_account,
-        )?;
-    }
+    let creator_amount = calculate_shares(amount, payout_account.share as u64)?;
+    pay_account(
+        creator_amount,
+        &payout_account.authority,
+        passbook,
+        user_wallet,
+        user_token_account,
+        payout_account.payout_account,
+        payout_account.token_account,
+    )?;
     Ok(())
 }
 
@@ -417,23 +376,21 @@ pub fn distribute_referral_payout_for_creators<'a>(
     passbook: &PassBook,
     user_wallet: &AccountInfo<'a>,
     user_token_account: &AccountInfo<'a>,
-    payout_accounts: &[PayoutInfo<'a>],
+    payout_account: &PayoutInfo<'a>,
 ) -> Result<(), ProgramError> {
     if amount == 0 {
         return Ok(());
     }
-    for creator in payout_accounts {
-        let creator_amount = calculate_shares(amount, creator.share as u64)?;
-        pay_account(
-            creator_amount,
-            &creator.authority,
-            passbook,
-            user_wallet,
-            user_token_account,
-            creator.payout_account,
-            creator.token_account,
-        )?;
-    }
+    let creator_amount = calculate_shares(amount, payout_account.share as u64)?;
+    pay_account(
+        creator_amount,
+        &payout_account.authority,
+        passbook,
+        user_wallet,
+        user_token_account,
+        payout_account.payout_account,
+        payout_account.token_account,
+    )?;
     Ok(())
 }
 
@@ -470,6 +427,46 @@ pub fn get_or_create_trade_history<'a>(
             let mut data = TradeHistory::unpack_unchecked(&history_info.data.borrow_mut())?;
 
             data.init(*passbook_info.key, *user_wallet_info.key);
+            Ok(data)
+        }
+    };
+
+    proving_process
+}
+
+pub fn get_or_create_membership<'a>(
+    program_id: &Pubkey,
+    membership_info: &AccountInfo<'a>,
+    user_wallet_info: &AccountInfo<'a>,
+    store_info: &AccountInfo<'a>,
+    payer_info: &AccountInfo<'a>,
+    rent_sysvar_info: &AccountInfo<'a>,
+    system_program_info: &AccountInfo<'a>,
+    signers_seeds: &[&[u8]],
+) -> Result<Membership, ProgramError> {
+    // set up pass store account
+
+    let unpack = Membership::unpack(&membership_info.data.borrow_mut());
+
+    let proving_process = match unpack {
+        Ok(data) => Ok(data),
+        Err(_) => {
+            // create pass store account
+            create_or_allocate_account_raw(
+                *program_id,
+                membership_info,
+                rent_sysvar_info,
+                system_program_info,
+                payer_info,
+                Membership::LEN,
+                signers_seeds,
+            )?;
+
+            msg!("New membership account was created");
+
+            let mut data = Membership::unpack_unchecked(&membership_info.data.borrow_mut())?;
+
+            data.init(*store_info.key, *user_wallet_info.key);
             Ok(data)
         }
     };
