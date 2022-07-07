@@ -34,7 +34,7 @@ impl TradeHistory {
     pub const PREFIX: &'static str = "history";
     /// Initialize a PackSet
     pub fn init(&mut self, passbook: Pubkey, wallet: Pubkey) {
-        self.account_type = AccountType::PassStore;
+        self.account_type = AccountType::TradeHistory;
         self.passbook = passbook;
         self.already_bought = 0;
         self.wallet = wallet;

@@ -9,11 +9,13 @@ use solana_program::{
     program::{invoke, invoke_signed},
     program_error::ProgramError,
     program_memory::sol_memcmp,
-    program_pack::IsInitialized,
+    program_pack::{IsInitialized, Pack},
     pubkey::{Pubkey, PUBKEY_BYTES},
     system_instruction,
     sysvar::{rent::Rent, Sysvar},
 };
+
+use spl_associated_token_account::{instruction::create_associated_token_account};
 
 /// Assert uninitialized
 pub fn assert_uninitialized<T: IsInitialized>(account: &T) -> ProgramResult {
@@ -355,6 +357,7 @@ pub fn mpl_mint_new_edition_from_master_edition_via_token<'a>(
     new_edition: &AccountInfo<'a>,
     new_mint: &AccountInfo<'a>,
     new_mint_authority: &AccountInfo<'a>,
+    payer: &AccountInfo<'a>,
     user_wallet: &AccountInfo<'a>,
     token_account_owner: &AccountInfo<'a>,
     token_account: &AccountInfo<'a>,
@@ -375,7 +378,7 @@ pub fn mpl_mint_new_edition_from_master_edition_via_token<'a>(
         *master_edition.key,
         *new_mint.key,
         *new_mint_authority.key,
-        *user_wallet.key,
+        *payer.key,
         *token_account_owner.key,
         *token_account.key,
         *user_wallet.key,
@@ -412,7 +415,6 @@ pub fn mpl_update_primary_sale_happened_via_token<'a>(
     metadata: &AccountInfo<'a>,
     owner: &AccountInfo<'a>,
     token: &AccountInfo<'a>,
-    signers_seeds: &[&[u8]],
 ) -> Result<(), ProgramError> {
     let tx = mpl_token_metadata::instruction::update_primary_sale_happened_via_token(
         mpl_token_metadata::id(),
@@ -420,11 +422,9 @@ pub fn mpl_update_primary_sale_happened_via_token<'a>(
         *owner.key,
         *token.key,
     );
-
-    invoke_signed(
+    invoke(
         &tx,
         &[metadata.clone(), owner.clone(), token.clone()],
-        &[&signers_seeds],
     )
 }
 
@@ -473,4 +473,39 @@ pub fn calculate_shares_less_points(
                 .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?,
         )
         .ok_or::<ProgramError>(NFTPassError::MathOverflow.into())?)
+}
+
+pub fn create_associated_token_account_raw<'a>(
+    payer_info: &AccountInfo<'a>,
+    wallet_info: &AccountInfo<'a>,
+    mint_info: &AccountInfo<'a>,
+    token_info: &AccountInfo<'a>,
+    spl_token_program_info: &AccountInfo<'a>,
+    rent_sysvar_info: &AccountInfo<'a>,
+    system_program_info: &AccountInfo<'a>,
+) -> ProgramResult {
+    invoke(
+        &create_associated_token_account(payer_info.key, wallet_info.key, mint_info.key),
+        &[
+            payer_info.clone(),
+            token_info.clone(),
+            wallet_info.clone(),
+            mint_info.clone(),
+            system_program_info.clone(),
+            spl_token_program_info.clone(),
+            rent_sysvar_info.clone(),
+        ],
+    )
+}
+
+/// assert initialized account
+pub fn assert_initialized<T: Pack + IsInitialized>(
+    account_info: &AccountInfo,
+) -> Result<T, ProgramError> {
+    let account: T = T::unpack_unchecked(&account_info.data.borrow())?;
+    if !account.is_initialized() {
+        Err(NFTPassError::Uninitialized.into())
+    } else {
+        Ok(account)
+    }
 }

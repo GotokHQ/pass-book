@@ -51,15 +51,14 @@ impl TestMetadata {
         creator: Option<&Keypair>,
         seller_fee_basis_points: u16,
         is_mutable: bool,
-        token_account: &Keypair,
-        token_owner: &Pubkey,
+        token_authority: &Pubkey
     ) -> Result<(), BanksClientError> {
         create_mint(context, &self.mint, &context.payer.pubkey(), None).await?;
-        create_token_account(context, token_account, &self.mint.pubkey(), token_owner).await?;
+        create_token_account(context, &self.token, &self.mint.pubkey(), token_authority).await?;
         mint_tokens(
             context,
             &self.mint.pubkey(),
-            &token_account.pubkey(),
+            &self.token.pubkey(),
             1,
             &context.payer.pubkey(),
             None,

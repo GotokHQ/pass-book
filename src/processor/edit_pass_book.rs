@@ -31,8 +31,8 @@ pub fn edit_pass_book(
 
     let mut pass_book = PassBook::unpack(&pass_book_account.data.borrow_mut())?;
 
-    assert_account_key(authority_account, &pass_book.authority, 
-        Some(NFTPassError::InvalidAuthorityKey),)?;
+    assert_account_key(authority_account, &pass_book.creator, 
+        Some(NFTPassError::InvalidCreatorKey),)?;
 
     pass_book.assert_able_to_edit()?;
 
@@ -97,7 +97,7 @@ fn apply_changes(pass_book: &mut PassBook, changes: EditPassBookArgs, price_mint
     }
 
     if let Some(new_price_mint_account) = price_mint_account {
-        if *new_price_mint_account.key == pass_book.price_mint {
+        if *new_price_mint_account.key == pass_book.mint {
             return Err(NFTPassError::CantSetTheSameValue.into());
         }
         let is_native = cmp_pubkeys(new_price_mint_account.key, &spl_token::native_mint::id());
@@ -106,7 +106,7 @@ fn apply_changes(pass_book: &mut PassBook, changes: EditPassBookArgs, price_mint
             assert_owned_by(new_price_mint_account, &spl_token::id())?;
         }
 
-        pass_book.price_mint = *new_price_mint_account.key;
+        pass_book.mint = *new_price_mint_account.key;
     }
 
     Ok(())

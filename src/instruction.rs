@@ -39,8 +39,6 @@ pub struct InitPassBookArgs {
     pub has_market_authority: bool,
     /// The date after which referral rewards expires
     pub referral_end_date: Option<u64>,
-    /// The maximum number of passes a user can have in wallet
-    pub pieces_in_one_wallet: Option<u64>,
 }
 
 /// Edit a PassBook arguments
@@ -218,21 +216,12 @@ pub fn delete_pass_book(
     passbook: &Pubkey,
     authority: &Pubkey,
     refunder: &Pubkey,
-    token_account: &Pubkey,
-    mint_account: &Pubkey,
-    new_master_edition_owner: Option<&Pubkey>,
 ) -> Instruction {
-    let mut accounts = vec![
+    let accounts = vec![
         AccountMeta::new(*passbook, false),
         AccountMeta::new_readonly(*authority, true),
         AccountMeta::new(*refunder, false),
-        AccountMeta::new(*token_account, false),
-        AccountMeta::new(*mint_account, false),
-        AccountMeta::new_readonly(spl_token::id(), false),
     ];
-    if let Some(new_master_edition) = new_master_edition_owner {
-        accounts.push(AccountMeta::new(*new_master_edition, false))
-    }
     Instruction::new_with_borsh(*program_id, &NFTPassInstruction::DeletePassBook, accounts)
 }
 
@@ -241,7 +230,7 @@ pub fn edit_pass_book(
     program_id: &Pubkey,
     passbook: &Pubkey,
     authority: &Pubkey,
-    price_mint: Option<&Pubkey>,
+    mint: Option<&Pubkey>,
     args: EditPassBookArgs,
 ) -> Instruction {
     let mut accounts = vec![
@@ -249,7 +238,7 @@ pub fn edit_pass_book(
         AccountMeta::new_readonly(*authority, true),
     ];
 
-    if let Some(new_price_mint) = price_mint {
+    if let Some(new_price_mint) = mint {
         accounts.push(AccountMeta::new_readonly(*new_price_mint, false))
     }
 
@@ -265,40 +254,76 @@ pub fn edit_pass_book(
 pub fn init_pass_book(
     program_id: &Pubkey,
     passbook: &Pubkey,
-    source: &Pubkey,
-    token_account: &Pubkey,
     store: &Pubkey,
-    authority: &Pubkey,
+    creator: &Pubkey,
     payer: &Pubkey,
     mint: &Pubkey,
-    master_metadata: &Pubkey,
-    master_edition: &Pubkey,
-    price_mint: &Pubkey,
-    market_authority: Option<&PayoutInfoArgs>,
-    referral_authority: Option<&PayoutInfoArgs>,
+    creator_payout: &PayoutInfoArgs,
+    market_payout: Option<&PayoutInfoArgs>,
+    referral_payout: Option<&PayoutInfoArgs>,
     args: InitPassBookArgs,
-    creator_payout: &[PayoutInfoArgs],
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(*passbook, false),
-        AccountMeta::new(*source, false),
-        AccountMeta::new(*token_account, false),
         AccountMeta::new(*store, false),
-        AccountMeta::new_readonly(*authority, true),
+        AccountMeta::new_readonly(*creator, true),
         AccountMeta::new_readonly(*payer, true),
         AccountMeta::new_readonly(*mint, false),
-        AccountMeta::new(*master_metadata, false),
-        AccountMeta::new_readonly(*master_edition, false),
-        AccountMeta::new_readonly(*price_mint, false),
         AccountMeta::new_readonly(sysvar::clock::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
         AccountMeta::new_readonly(system_program::id(), false),
+        AccountMeta::new(creator_payout.payout_account, false),
+        AccountMeta::new(creator_payout.token_account, false),
     ];
 
-    for payout in creator_payout.iter() {
-        accounts.push(AccountMeta::new(payout.payout_account, false));
-        accounts.push(AccountMeta::new(payout.token_account, false))
+    if let Some(market_place) = market_payout {
+        accounts.push(AccountMeta::new_readonly(market_place.authority, true));
+        accounts.push(AccountMeta::new(market_place.payout_account, false));
+        accounts.push(AccountMeta::new(market_place.token_account, false))
     }
+
+    if let Some(referral) = referral_payout {
+        accounts.push(AccountMeta::new_readonly(referral.authority, false));
+        accounts.push(AccountMeta::new(referral.payout_account, false));
+        accounts.push(AccountMeta::new(referral.token_account, false))
+    }
+    Instruction::new_with_borsh(
+        *program_id,
+        &NFTPassInstruction::InitPassBook(args),
+        accounts,
+    )
+}
+
+
+/// Create `InitPassBook` instruction
+pub fn buy_pass(
+    program_id: &Pubkey,
+    passbook: &Pubkey,
+    store: &Pubkey,
+    user_wallet: &Pubkey,
+    user_token_account: &Pubkey,
+    payer: &Pubkey,
+    trade_history: &Pubkey,
+    membership: &Pubkey,
+    market_authority: Option<&PayoutInfoArgs>,
+    referral_authority: Option<&PayoutInfoArgs>,
+    creator_payout: &PayoutInfoArgs,
+    args: BuyPassArgs,
+) -> Instruction {
+    let mut accounts = vec![
+        AccountMeta::new(*passbook, false),
+        AccountMeta::new(*store, false),
+        AccountMeta::new(*user_wallet, true),
+        AccountMeta::new(*user_token_account, false),
+        AccountMeta::new(*payer, true),
+        AccountMeta::new(*trade_history, false),
+        AccountMeta::new(*membership, false),
+        AccountMeta::new_readonly(sysvar::clock::id(), false),
+        AccountMeta::new_readonly(sysvar::rent::id(), false),
+        AccountMeta::new_readonly(system_program::id(), false),    
+        AccountMeta::new(creator_payout.payout_account, false),  
+        AccountMeta::new(creator_payout.token_account, false),
+    ];
 
     if let Some(market_place) = market_authority {
         accounts.push(AccountMeta::new_readonly(market_place.authority, true));
@@ -313,78 +338,6 @@ pub fn init_pass_book(
     }
 
     accounts.push(AccountMeta::new_readonly(spl_token::id(), false));
-    accounts.push(AccountMeta::new_readonly(mpl_token_metadata::id(), false));
-
-    Instruction::new_with_borsh(
-        *program_id,
-        &NFTPassInstruction::InitPassBook(args),
-        accounts,
-    )
-}
-
-
-/// Create `InitPassBook` instruction
-pub fn buy_pass(
-    program_id: &Pubkey,
-    passbook: &Pubkey,
-    store: &Pubkey,
-    vault_token: &Pubkey,
-    user_wallet: &Pubkey,
-    user_wallet_account: &Pubkey,
-    payer: &Pubkey,
-    new_metadata: &Pubkey,
-    new_edition: &Pubkey,
-    new_mint: &Pubkey,
-    master_metadata: &Pubkey,
-    master_edition: &Pubkey,
-    edition_marker: &Pubkey,
-    new_token_account: &Pubkey,
-    trade_history: &Pubkey,
-    market_authority: Option<&PayoutInfoArgs>,
-    referral_authority: Option<&PayoutInfoArgs>,
-    args: BuyPassArgs,
-    creator_payout: &[PayoutInfoArgs],
-) -> Instruction {
-    let mut accounts = vec![
-        AccountMeta::new(*passbook, true),
-        AccountMeta::new(*store, true),
-        AccountMeta::new(*vault_token, false),
-        AccountMeta::new(*user_wallet, true),
-        AccountMeta::new_readonly(*user_wallet_account, true),
-        AccountMeta::new_readonly(*payer, true),
-        AccountMeta::new_readonly(*new_metadata, true),
-        AccountMeta::new_readonly(*new_edition, true),
-        AccountMeta::new_readonly(*new_mint, true),
-        AccountMeta::new(*master_metadata, true),
-        AccountMeta::new_readonly(*master_edition, true),
-        AccountMeta::new_readonly(*edition_marker, true),
-        AccountMeta::new_readonly(*new_token_account, true),
-        AccountMeta::new_readonly(*trade_history, true),
-        AccountMeta::new_readonly(sysvar::clock::id(), false),
-        AccountMeta::new_readonly(sysvar::rent::id(), false),
-        AccountMeta::new_readonly(system_program::id(), false),    
-        AccountMeta::new_readonly(spl_token::id(), false)
-    ];
-
-    for payout in creator_payout.iter() {
-        accounts.push(AccountMeta::new(payout.payout_account, false));
-        accounts.push(AccountMeta::new(payout.token_account, false))
-    }
-
-    if let Some(market_place) = market_authority {
-        accounts.push(AccountMeta::new_readonly(market_place.authority, true));
-        accounts.push(AccountMeta::new(market_place.payout_account, false));
-        accounts.push(AccountMeta::new(market_place.token_account, false))
-    }
-
-    if let Some(referral) = referral_authority {
-        accounts.push(AccountMeta::new_readonly(referral.authority, false));
-        accounts.push(AccountMeta::new(referral.payout_account, false));
-        accounts.push(AccountMeta::new(referral.token_account, false))
-    }
-
-    accounts.push(AccountMeta::new_readonly(mpl_token_metadata::id(), false));
-
     Instruction::new_with_borsh(
         *program_id,
         &NFTPassInstruction::BuyPass(args),

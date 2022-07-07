@@ -15,7 +15,6 @@ pub struct PayoutInfoArgs {
     pub authority: Pubkey,
     pub payout_account: Pubkey,
     pub token_account: Pubkey,
-    pub share: u8,
 }
 
 // maximum number of balances to hold
