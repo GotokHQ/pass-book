@@ -270,9 +270,6 @@ pub fn get_or_create_payout_account<'a>(
     let treasury_holder_info = next_account_info(remaining_accounts)?;
     let (payout_key, payout_bump_seed) =
         find_payout_program_address(program_id, authority, mint_info.key);
-
-    msg!("PAYOUT INFO KEY -----------------> {}", payout_info.key);
-    msg!("PAYOUT DERIVED KEY -----------------> {}", payout_key);
     assert_account_key(
         payout_info,
         &payout_key,

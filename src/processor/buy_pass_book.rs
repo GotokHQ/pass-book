@@ -173,6 +173,7 @@ pub fn buy<'a>(
         clock,
         account_info_iter,
     )?;
+    msg!("DONE DISTRIBUTING");
     if is_new_membership {
         pass_store.increment_membership_count()?;
     }
@@ -311,8 +312,9 @@ pub fn distribute_payout<'a>(
             market_payout_info,
             market_payout_token_info,
         )?;
+        msg!("DONE SEND PAYOUT FOR MARKET PLACE");
     }
-
+    msg!("DONE DISTRIBUTE PAYOUT FOR MARKET PLACE");
     if let Some(referrer) = store.referrer {
         if let Some(referral_end_date) = store.referral_end_date {
             if clock.unix_timestamp as u64 > referral_end_date {
@@ -347,6 +349,7 @@ pub fn distribute_payout<'a>(
             &creator_payout,
         )?;
     }
+    msg!("DONE DISTRIBUTE REFERRAL FOR MARKET PLACE");
     Ok(())
 }
 

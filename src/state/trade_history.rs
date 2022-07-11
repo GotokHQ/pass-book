@@ -13,8 +13,8 @@ use solana_program::{
 
 pub const MAX_TRADE_HISTORY_LEN: usize = 1+
 32 // passbook
-+ 8 // already_bought
-+ 32; // wallet
++ 32 // already_bought
++ 8; // wallet
 
 /// Trade History
 #[repr(C)]
@@ -24,10 +24,10 @@ pub struct TradeHistory {
     pub account_type: AccountType,
     /// Passbook
     pub passbook: Pubkey,
-    /// The amount of passes purchased by wallet
-    pub already_bought: u64,
     /// The user wallet with this history
     pub wallet: Pubkey,
+    /// The amount of passes purchased by wallet
+    pub already_bought: u64,
 }
 
 impl TradeHistory {
